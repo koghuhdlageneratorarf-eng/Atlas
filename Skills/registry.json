@@ -1,0 +1,9 @@
+{
+  "skills": [
+    {
+      "name": "agency",
+      "path": "agency",
+      "source": "https://github.com/StartBootstrap/startbootstrap-agency.git"
+    }
+  ]
+}
