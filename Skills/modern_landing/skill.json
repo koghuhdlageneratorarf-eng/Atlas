@@ -1,0 +1,7 @@
+﻿{
+  "name": "modern_landing",
+  "version": "1.0.0",
+  "description": "Professional landing page template with Tailwind CSS",
+  "entry": "template.html",
+  "dependencies": []
+}
