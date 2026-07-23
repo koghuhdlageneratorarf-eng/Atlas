@@ -90,7 +90,7 @@ Gotovyy HTML:"""
     
     messages = [{"role": "user", "content": prompt}]
     print("   Zapolnenie shablona...")
-    html_code = ask_llm(messages)
+    html_code = ask_llm(messages, agent="developer")
     
     html_code = html_code.strip()
     if html_code.startswith("```html"):
@@ -123,7 +123,7 @@ def run_developer(task: str, project_dir: str, skill_name: str = None):
         print("   [!] Ne udalos zagruzit skill, generatsiya s nulya...")
         prompt = f"Sozday HTML-sayt dlya: {task}. Tolko kod."
         messages = [{"role": "user", "content": prompt}]
-        html_code = ask_llm(messages)
+        html_code = ask_llm(messages, agent="developer")
     else:
         copy_assets(skill_path, entry_file, project_path)
         html_code = fill_template(task, template, brief)

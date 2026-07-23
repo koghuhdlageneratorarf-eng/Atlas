@@ -36,7 +36,7 @@ def run_executive(task: str):
     ]
 
     print("Executive dumayet (7B)...")
-    answer = ask_llm(messages, model="qwen2.5-coder:7b")
+    answer = ask_llm(messages, agent="executive")
 
     try:
         cleaned = answer.strip()
