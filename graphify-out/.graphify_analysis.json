@@ -1,0 +1,398 @@
+{
+  "communities": {
+    "0": [
+      "brain_graphify_bridge",
+      "brain_graphify_bridge_build_graph",
+      "brain_graphify_bridge_find_skill",
+      "brain_graphify_bridge_get_context",
+      "brain_graphify_bridge_get_file_neighbors",
+      "brain_graphify_bridge_graphifybridge",
+      "brain_graphify_bridge_graphifybridge_build",
+      "brain_graphify_bridge_graphifybridge_build_fallback",
+      "brain_graphify_bridge_graphifybridge_find_skill",
+      "brain_graphify_bridge_graphifybridge_get_agents_catalog",
+      "brain_graphify_bridge_graphifybridge_get_context",
+      "brain_graphify_bridge_graphifybridge_get_file_neighbors",
+      "brain_graphify_bridge_graphifybridge_get_skills_catalog",
+      "brain_graphify_bridge_graphifybridge_init",
+      "brain_graphify_bridge_graphifybridge_load",
+      "brain_graphify_bridge_graphifybridge_needs_rebuild",
+      "brain_graphify_bridge_graphifybridge_read_json_safe",
+      "brain_graphify_bridge_rationale_1",
+      "brain_graphify_bridge_rationale_109",
+      "brain_graphify_bridge_rationale_118",
+      "brain_graphify_bridge_rationale_149",
+      "brain_graphify_bridge_rationale_169"
+    ],
+    "1": [
+      "c_users_diman_desktop_ai_atlas_skills_agency_scripts_sb_watch",
+      "skills_agency_scripts_build_assets",
+      "skills_agency_scripts_build_assets_renderassets",
+      "skills_agency_scripts_render_assets",
+      "skills_agency_scripts_render_assets_fs",
+      "skills_agency_scripts_render_assets_sh",
+      "skills_agency_scripts_render_assets_upath",
+      "skills_agency_scripts_sb_watch",
+      "skills_agency_scripts_sb_watch_allpugfiles",
+      "skills_agency_scripts_sb_watch_chokidar",
+      "skills_agency_scripts_sb_watch_handlepug",
+      "skills_agency_scripts_sb_watch_handlescss",
+      "skills_agency_scripts_sb_watch_processfile",
+      "skills_agency_scripts_sb_watch_renderallpug",
+      "skills_agency_scripts_sb_watch_renderassets",
+      "skills_agency_scripts_sb_watch_renderpug",
+      "skills_agency_scripts_sb_watch_renderscripts",
+      "skills_agency_scripts_sb_watch_renderscss",
+      "skills_agency_scripts_sb_watch_upath",
+      "skills_agency_scripts_sb_watch_watcher"
+    ],
+    "2": [
+      "autoprefixer",
+      "browser_sync",
+      "chokidar",
+      "concurrently",
+      "postcss",
+      "prettier",
+      "pug",
+      "shelljs",
+      "skills_agency_package_devdependencies",
+      "skills_agency_package_devdependencies_autoprefixer",
+      "skills_agency_package_devdependencies_browser_sync",
+      "skills_agency_package_devdependencies_chokidar",
+      "skills_agency_package_devdependencies_concurrently",
+      "skills_agency_package_devdependencies_postcss",
+      "skills_agency_package_devdependencies_prettier",
+      "skills_agency_package_devdependencies_pug",
+      "skills_agency_package_devdependencies_shelljs",
+      "skills_agency_package_devdependencies_upath",
+      "upath"
+    ],
+    "3": [
+      "bootstrap",
+      "ref_david_miller_https_davidmiller_io",
+      "skills_agency_package",
+      "skills_agency_package_author",
+      "skills_agency_package_bugs",
+      "skills_agency_package_bugs_email",
+      "skills_agency_package_bugs_url",
+      "skills_agency_package_contributors",
+      "skills_agency_package_dependencies",
+      "skills_agency_package_dependencies_bootstrap",
+      "skills_agency_package_description",
+      "skills_agency_package_homepage",
+      "skills_agency_package_license",
+      "skills_agency_package_name",
+      "skills_agency_package_repository",
+      "skills_agency_package_repository_type",
+      "skills_agency_package_repository_url",
+      "skills_agency_package_title",
+      "skills_agency_package_version"
+    ],
+    "4": [
+      "ref_css",
+      "ref_html",
+      "ref_responsive",
+      "ref_template",
+      "ref_theme",
+      "sass",
+      "skills_agency_package_devdependencies_sass",
+      "skills_agency_package_keywords",
+      "skills_agency_scripts_build_scss",
+      "skills_agency_scripts_build_scss_renderscss",
+      "skills_agency_scripts_render_scss",
+      "skills_agency_scripts_render_scss_autoprefixer",
+      "skills_agency_scripts_render_scss_destpath",
+      "skills_agency_scripts_render_scss_fs",
+      "skills_agency_scripts_render_scss_packagejson",
+      "skills_agency_scripts_render_scss_postcss",
+      "skills_agency_scripts_render_scss_sass",
+      "skills_agency_scripts_render_scss_sh",
+      "skills_agency_scripts_render_scss_upath"
+    ],
+    "5": [
+      "agents_brief",
+      "agents_brief_rationale_1",
+      "agents_brief_rationale_32",
+      "agents_brief_run_brief",
+      "agents_brief_structure_existing_tz",
+      "agents_executive",
+      "agents_executive_rationale_1",
+      "agents_executive_run_executive",
+      "config_llm_client",
+      "config_llm_client_ask_llm",
+      "config_llm_client_call_ollama",
+      "config_llm_client_call_provider",
+      "config_llm_client_diagnose",
+      "config_llm_client_rationale_1",
+      "config_llm_client_rationale_110",
+      "config_llm_client_rationale_120",
+      "config_llm_client_rationale_178",
+      "config_llm_client_rationale_92"
+    ],
+    "6": [
+      "agents_developer",
+      "agents_developer_copy_assets",
+      "agents_developer_fill_template",
+      "agents_developer_inject_aos",
+      "agents_developer_load_skill",
+      "agents_developer_rationale_1",
+      "agents_developer_rationale_24",
+      "agents_developer_run_developer",
+      "main",
+      "main_main",
+      "main_rationale_1",
+      "main_run_subprocess",
+      "path"
+    ],
+    "7": [
+      "skills_agency_scripts_build_pug",
+      "skills_agency_scripts_build_pug_processfile",
+      "skills_agency_scripts_build_pug_renderpug",
+      "skills_agency_scripts_build_pug_sh",
+      "skills_agency_scripts_build_pug_srcpath",
+      "skills_agency_scripts_build_pug_upath",
+      "skills_agency_scripts_render_pug",
+      "skills_agency_scripts_render_pug_fs",
+      "skills_agency_scripts_render_pug_prettier",
+      "skills_agency_scripts_render_pug_pug",
+      "skills_agency_scripts_render_pug_sh",
+      "skills_agency_scripts_render_pug_upath"
+    ],
+    "8": [
+      "tools_self_upgrade",
+      "tools_self_upgrade_analyze_system",
+      "tools_self_upgrade_main",
+      "tools_self_upgrade_make_backup",
+      "tools_self_upgrade_rationale_1",
+      "tools_self_upgrade_rationale_105",
+      "tools_self_upgrade_rationale_28",
+      "tools_self_upgrade_rationale_49",
+      "tools_self_upgrade_rationale_68",
+      "tools_self_upgrade_save_suggestion",
+      "tools_self_upgrade_scan_files"
+    ],
+    "9": [
+      "brain_memory_graph",
+      "brain_memory_graph_get_recent_context",
+      "brain_memory_graph_init_db",
+      "brain_memory_graph_log_bug",
+      "brain_memory_graph_log_decision",
+      "brain_memory_graph_log_episode",
+      "brain_memory_graph_rationale_1",
+      "brain_memory_graph_rationale_10",
+      "brain_memory_graph_rationale_73",
+      "brain_memory_graph_rationale_85"
+    ],
+    "10": [
+      "tools_skills_manager",
+      "tools_skills_manager_add_skill",
+      "tools_skills_manager_info_skill",
+      "tools_skills_manager_install_dependencies",
+      "tools_skills_manager_list_skills",
+      "tools_skills_manager_load_registry",
+      "tools_skills_manager_main",
+      "tools_skills_manager_remove_skill",
+      "tools_skills_manager_save_registry",
+      "tools_skills_manager_skill_exists"
+    ],
+    "11": [
+      "skills_agency_package_scripts",
+      "skills_agency_package_scripts_build",
+      "skills_agency_package_scripts_build_assets",
+      "skills_agency_package_scripts_build_pug",
+      "skills_agency_package_scripts_build_scripts",
+      "skills_agency_package_scripts_build_scss",
+      "skills_agency_package_scripts_clean",
+      "skills_agency_package_scripts_start",
+      "skills_agency_package_scripts_start_debug"
+    ],
+    "12": [
+      "skills_agency_scripts_build_scripts",
+      "skills_agency_scripts_build_scripts_renderscripts",
+      "skills_agency_scripts_render_scripts",
+      "skills_agency_scripts_render_scripts_fs",
+      "skills_agency_scripts_render_scripts_packagejson",
+      "skills_agency_scripts_render_scripts_sh",
+      "skills_agency_scripts_render_scripts_upath"
+    ],
+    "13": [
+      "skills_agency_scripts_start",
+      "skills_agency_scripts_start_browsersyncpath",
+      "skills_agency_scripts_start_concurrently",
+      "skills_agency_scripts_start_failure",
+      "skills_agency_scripts_start_success",
+      "skills_agency_scripts_start_upath"
+    ],
+    "14": [
+      "skills_agency_scripts_start_debug",
+      "skills_agency_scripts_start_debug_browsersyncpath",
+      "skills_agency_scripts_start_debug_concurrently",
+      "skills_agency_scripts_start_debug_failure",
+      "skills_agency_scripts_start_debug_success",
+      "skills_agency_scripts_start_debug_upath"
+    ],
+    "15": [
+      "skills_agency_skill",
+      "skills_agency_skill_dependencies",
+      "skills_agency_skill_description",
+      "skills_agency_skill_entry",
+      "skills_agency_skill_name",
+      "skills_agency_skill_version"
+    ],
+    "16": [
+      "skills_modern_landing_skill",
+      "skills_modern_landing_skill_dependencies",
+      "skills_modern_landing_skill_description",
+      "skills_modern_landing_skill_entry",
+      "skills_modern_landing_skill_name",
+      "skills_modern_landing_skill_version"
+    ],
+    "17": [
+      "skills_agency_scripts_clean",
+      "skills_agency_scripts_clean_destpath",
+      "skills_agency_scripts_clean_sh",
+      "skills_agency_scripts_clean_upath"
+    ],
+    "18": [
+      "skills_agency_src_js_scripts"
+    ],
+    "19": [
+      "tools_init_project"
+    ]
+  },
+  "cohesion": {
+    "0": 0.1341991341991342,
+    "1": 0.14210526315789473,
+    "2": 0.10526315789473684,
+    "3": 0.10526315789473684,
+    "4": 0.10526315789473684,
+    "5": 0.1568627450980392,
+    "6": 0.24358974358974358,
+    "7": 0.18181818181818182,
+    "8": 0.2545454545454545,
+    "9": 0.26666666666666666,
+    "10": 0.4444444444444444,
+    "11": 0.2222222222222222,
+    "12": 0.2857142857142857,
+    "13": 0.3333333333333333,
+    "14": 0.3333333333333333,
+    "15": 0.3333333333333333,
+    "16": 0.3333333333333333,
+    "17": 0.5,
+    "18": 1.0,
+    "19": 1.0
+  },
+  "gods": [
+    {
+      "id": "brain_graphify_bridge_graphifybridge",
+      "label": "GraphifyBridge",
+      "degree": 12
+    },
+    {
+      "id": "config_llm_client_ask_llm",
+      "label": "ask_llm()",
+      "degree": 10
+    },
+    {
+      "id": "skills_agency_package_scripts",
+      "label": "scripts",
+      "degree": 9
+    },
+    {
+      "id": "skills_agency_package_keywords",
+      "label": "keywords",
+      "degree": 7
+    },
+    {
+      "id": "agents_developer_run_developer",
+      "label": "run_developer()",
+      "degree": 7
+    },
+    {
+      "id": "tools_skills_manager_main",
+      "label": "main()",
+      "degree": 6
+    },
+    {
+      "id": "brain_memory_graph_init_db",
+      "label": "_init_db()",
+      "degree": 5
+    },
+    {
+      "id": "skills_agency_scripts_sb_watch_processfile",
+      "label": "_processFile()",
+      "degree": 5
+    },
+    {
+      "id": "tools_self_upgrade_main",
+      "label": "main()",
+      "degree": 5
+    },
+    {
+      "id": "tools_skills_manager_add_skill",
+      "label": "add_skill()",
+      "degree": 5
+    }
+  ],
+  "surprises": [
+    {
+      "source": "analyze_system()",
+      "target": "ask_llm()",
+      "source_files": [
+        "Tools/self_upgrade.py",
+        "Config/llm_client.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "fill_template()",
+      "target": "ask_llm()",
+      "source_files": [
+        "Agents/developer.py",
+        "Config/llm_client.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "run_developer()",
+      "target": "ask_llm()",
+      "source_files": [
+        "Agents/developer.py",
+        "Config/llm_client.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "run_executive()",
+      "target": "ask_llm()",
+      "source_files": [
+        "Agents/executive.py",
+        "Config/llm_client.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; peripheral node `run_executive()` unexpectedly reaches hub `ask_llm()`"
+    },
+    {
+      "source": "structure_existing_tz()",
+      "target": "ask_llm()",
+      "source_files": [
+        "Agents/brief.py",
+        "Config/llm_client.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

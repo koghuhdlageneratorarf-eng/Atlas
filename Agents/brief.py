@@ -45,7 +45,7 @@ PRAVILA:
 Rezultat:"""
     
     messages = [{"role": "user", "content": prompt}]
-    return ask_llm(messages, model="qwen2.5-coder:3b")
+    return ask_llm(messages, agent="brief")
 
 
 def run_brief(task: str, project_dir: str):
@@ -66,7 +66,7 @@ def run_brief(task: str, project_dir: str):
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"Zapros: {task}"}
         ]
-        tz = ask_llm(messages, model="qwen2.5-coder:7b")
+        tz = ask_llm(messages, agent="brief")
 
     brief_file.write_text(tz, encoding="utf-8")
     print(f"   TZ sohraneno: {brief_file}")
