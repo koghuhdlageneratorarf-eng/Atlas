@@ -38,7 +38,7 @@ from atlas_core.context import ProjectContext
 from atlas_core.tools import execute_tool, create_backup, run_command
 
 try:
-    from model_router.llm_client import ask_llm
+    from Config.llm_client import ask_llm
     HAS_LLM_CLIENT = True
 except ImportError:
     HAS_LLM_CLIENT = False
@@ -79,10 +79,19 @@ def _call_llm(messages: List[Dict], agent: str = "executive") -> Dict:
         "response": "Config.llm_client не импортирован."
     }
 
-def _parse_tool_response(content: str) -> Dict:
+def _parse_tool_response(content) -> Dict:
     """Извлечь JSON из ответа LLM. Фиксит raw newlines внутри строк."""
-    if not content or not content.strip():
+    # Защита: content может быть dict, None или str
+    if isinstance(content, dict):
+        return {
+            "thought": content.get("thought", ""),
+            "tools": content.get("tools", []) or [],
+            "response": content.get("response", "")
+        }
+    if content is None:
         return {"thought": "", "tools": [], "response": ""}
+    if not isinstance(content, str) or not content.strip():
+        return {"thought": "", "tools": [], "response": str(content) if content else ""}
 
     cleaned = re.sub(r"```json\s*", "", content)
     cleaned = re.sub(r"```\s*", "", cleaned)
@@ -360,7 +369,7 @@ def main():
     print_banner()
 
     session_name = "default"
-    agent = AtlasCodeAgent(session_name)
+    agent = AtlasCodeAgent(session_name, agent_type="developer")
 
     print(f"Сессия: {session_name}")
     print(f"Проект: {PROJECT_ROOT}")
