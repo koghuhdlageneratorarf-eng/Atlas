@@ -1,296 +1,203 @@
 """
-atlas_core/tools.py — Инструменты для Atlas Code Agent
-LLM вызывает эти функции через Tool Use. Каждая функция возвращает
-строку-результат, который LLM видит и решает что делать дальше.
+Atlas_Core/tools.py — Tool Execution Layer
+Выполнение инструментов: файлы, git, команды, поиск.
 """
-
 import os
-import subprocess
-import shutil
+import re
 import json
+import time
+import shutil
+import subprocess
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Dict, Any, Optional
 
-# Корень проекта — родитель atlas_core/
 PROJECT_ROOT = Path(__file__).parent.parent
 
+def _safe_path(path_str: str) -> Path:
+    """Преобразовать путь в безопасный относительный путь внутри проекта."""
+    p = Path(path_str)
+    if p.is_absolute():
+        try:
+            p.relative_to(PROJECT_ROOT)
+        except ValueError:
+            raise ValueError(f"Path {path_str} is outside project root")
+    else:
+        p = PROJECT_ROOT / p
+    return p
 
-def _safe_path(rel_path: str) -> Path:
-    """Преобразовать относительный путь в абсолютный внутри проекта."""
-    rel_path = rel_path.replace("\\", "/").lstrip("/")
-    full = (PROJECT_ROOT / rel_path).resolve()
-    # Защита: путь должен быть внутри проекта
+WHITELISTED_PATHS = [
+    PROJECT_ROOT / "Skills",
+    PROJECT_ROOT / "Agent_Runtime",
+    PROJECT_ROOT / "UI",
+    PROJECT_ROOT / "Tool_Layer",
+    PROJECT_ROOT / "Knowledge_Layer",
+    PROJECT_ROOT / "Memory_Layer",
+    PROJECT_ROOT / "Prompts",
+]
+PROTECTED_PATHS = [
+    PROJECT_ROOT / "Config" / ".env",
+    PROJECT_ROOT / "Config" / "models.yaml",
+    PROJECT_ROOT / "Atlas_Core" / "session.py",
+    PROJECT_ROOT / "Atlas_Core" / "context.py",
+    PROJECT_ROOT / "Atlas_Core" / "tools.py",
+    PROJECT_ROOT / "Model_Router" / "llm_client.py",
+    PROJECT_ROOT / "Storage" / "memory_events.db",
+]
+
+def _is_protected(path: Path) -> bool:
+    for protected in PROTECTED_PATHS:
+        if path.resolve() == protected.resolve():
+            return True
+    return False
+
+def _get_path_arg(args: Dict[str, Any]) -> str:
+    """Fallback: LLM может использовать path, file_path или file."""
+    return args.get("path") or args.get("file_path") or args.get("file", "")
+
+def tool_list_directory(args: Dict[str, Any]) -> str:
+    path = _safe_path(args.get("path", "."))
+    if not path.exists():
+        return f"❌ Path not found: {path}"
+    lines = []
+    for item in sorted(path.iterdir()):
+        icon = "📁" if item.is_dir() else "📄"
+        lines.append(f"{icon} {item.name}")
+    return "\n".join(lines) if lines else "(empty)"
+
+def tool_read_file(args: Dict[str, Any]) -> str:
+    path = _safe_path(_get_path_arg(args))
+    if not path.exists():
+        return f"❌ File not found: {path}"
     try:
-        full.relative_to(PROJECT_ROOT.resolve())
-    except ValueError:
-        raise ValueError(f"Путь выходит за пределы проекта: {rel_path}")
-    return full
-
-
-# ═══════════════════════════════════════════════════════════════
-# TOOL: read_file
-# ═══════════════════════════════════════════════════════════════
-def read_file(path: str, offset: int = 0, limit: int = 0) -> str:
-    """Прочитать файл. offset — с какой строки, limit — сколько строк (0 = все)."""
-    try:
-        full = _safe_path(path)
-        if not full.exists():
-            return f"[ERROR] Файл не найден: {path}"
-        if not full.is_file():
-            return f"[ERROR] Это не файл: {path}"
-
-        with open(full, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-
-        if offset > 0:
-            lines = lines[offset:]
-        if limit > 0:
-            lines = lines[:limit]
-
-        content = "".join(lines)
-        total_lines = len(lines)
-
-        result = f"=== {path} (строки {offset+1}-{offset+total_lines}) ===\n"
-        result += content
-        if not content.endswith("\n"):
-            result += "\n"
-        return result
-    except Exception as e:
-        return f"[ERROR] {str(e)}"
-
-
-# ═══════════════════════════════════════════════════════════════
-# TOOL: write_file
-# ═══════════════════════════════════════════════════════════════
-def write_file(path: str, content: str, append: bool = False) -> str:
-    """Записать (или дописать) файл. Создаёт директории при необходимости."""
-    try:
-        full = _safe_path(path)
-        full.parent.mkdir(parents=True, exist_ok=True)
-
-        mode = "a" if append else "w"
-        with open(full, mode, encoding="utf-8") as f:
-            f.write(content)
-
-        action = "дописан" if append else "создан/перезаписан"
-        return f"[OK] Файл {action}: {path} ({len(content)} символов)"
-    except Exception as e:
-        return f"[ERROR] {str(e)}"
-
-
-# ═══════════════════════════════════════════════════════════════
-# TOOL: edit_file
-# ═══════════════════════════════════════════════════════════════
-def edit_file(path: str, old_string: str, new_string: str) -> str:
-    """Заменить old_string на new_string в файле. Точное совпадение."""
-    try:
-        full = _safe_path(path)
-        if not full.exists():
-            return f"[ERROR] Файл не найден: {path}"
-
-        with open(full, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, "r", encoding="utf-8") as f:
             content = f.read()
-
-        if old_string not in content:
-            return f"[ERROR] Строка не найдена в файле. Возможно, нужно уточнить."
-
-        new_content = content.replace(old_string, new_string, 1)
-
-        with open(full, "w", encoding="utf-8") as f:
-            f.write(new_content)
-
-        return f"[OK] Файл отредактирован: {path}"
+        limit = args.get("limit", 200)
+        if limit and len(content.splitlines()) > limit:
+            lines = content.splitlines()[:limit]
+            return "\n".join(lines) + f"\n\n... ({len(content.splitlines()) - limit} more lines)"
+        return content
     except Exception as e:
-        return f"[ERROR] {str(e)}"
+        return f"❌ Error reading {path}: {e}"
 
+def tool_write_file(args: Dict[str, Any]) -> str:
+    path = _safe_path(_get_path_arg(args))
+    if _is_protected(path):
+        return f"🚫 Protected file: {path}. Use manual edit."
+    content = args.get("content", "")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return f"✅ Written {path} ({len(content)} chars)"
 
-# ═══════════════════════════════════════════════════════════════
-# TOOL: list_directory
-# ═══════════════════════════════════════════════════════════════
-def list_directory(path: str = ".") -> str:
-    """Показать содержимое директории."""
+def tool_edit_file(args: Dict[str, Any]) -> str:
+    path = _safe_path(_get_path_arg(args))
+    if _is_protected(path):
+        return f"🚫 Protected file: {path}. Use manual edit."
+    if not path.exists():
+        return f"❌ File not found: {path}"
+    old = args.get("old_string", "")
+    new = args.get("new_string", "")
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+    if old not in content:
+        return f"❌ old_string not found in {path}"
+    content = content.replace(old, new, 1)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return f"✅ Edited {path}"
+
+def tool_run_command(args: Dict[str, Any]) -> str:
+    cmd = args.get("command", "")
+    cwd = args.get("cwd", str(PROJECT_ROOT))
+    timeout = args.get("timeout", 30)
     try:
-        full = _safe_path(path)
-        if not full.exists():
-            return f"[ERROR] Директория не найдена: {path}"
-        if not full.is_dir():
-            return f"[ERROR] Это не директория: {path}"
-
-        entries = sorted(full.iterdir(), key=lambda e: (e.is_file(), e.name.lower()))
-        lines = [f"=== Содержимое: {path} ==="]
-        for e in entries:
-            icon = "📁" if e.is_dir() else "📄"
-            size = f" ({e.stat().st_size} bytes)" if e.is_file() else ""
-            lines.append(f"{icon} {e.name}{size}")
-        return "\n".join(lines)
-    except Exception as e:
-        return f"[ERROR] {str(e)}"
-
-
-# ═══════════════════════════════════════════════════════════════
-# TOOL: run_command
-# ═══════════════════════════════════════════════════════════════
-def run_command(command: str, cwd: Optional[str] = None, timeout: int = 30) -> str:
-    """Выполнить shell-команду. cwd — относительно PROJECT_ROOT."""
-    try:
-        work_dir = PROJECT_ROOT if cwd is None else _safe_path(cwd)
-
         result = subprocess.run(
-            command,
-            shell=True,
-            cwd=work_dir,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout
+            cmd, shell=True, cwd=cwd, capture_output=True, text=True, timeout=timeout
         )
-
-        output = []
-        if result.stdout:
-            output.append(f"[STDOUT]\n{result.stdout}")
-        if result.stderr:
-            output.append(f"[STDERR]\n{result.stderr}")
+        out = result.stdout or ""
+        err = result.stderr or ""
         if result.returncode != 0:
-            output.append(f"[EXIT CODE] {result.returncode}")
-
-        return "\n".join(output) if output else "[OK] Команда выполнена (нет вывода)"
+            return f"⚠️ Exit code {result.returncode}\nSTDOUT:\n{out}\nSTDERR:\n{err}"
+        return out or "(no output)"
     except subprocess.TimeoutExpired:
-        return f"[ERROR] Таймаут ({timeout} сек)"
+        return f"⏱️ Command timed out after {timeout}s"
     except Exception as e:
-        return f"[ERROR] {str(e)}"
+        return f"❌ Error: {e}"
 
+def tool_search_files(args: Dict[str, Any]) -> str:
+    query = args.get("query", "")
+    path = _safe_path(args.get("path", "."))
+    results = []
+    for root, _, files in os.walk(path):
+        for fname in files:
+            if fname.endswith(".pyc") or ".git" in root:
+                continue
+            fpath = Path(root) / fname
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                if query in content:
+                    lines = [i+1 for i, line in enumerate(content.splitlines()) if query in line]
+                    results.append(f"{fpath.relative_to(PROJECT_ROOT)}: lines {lines}")
+            except Exception:
+                pass
+    return "\n".join(results[:20]) if results else "(no matches)"
 
-# ═══════════════════════════════════════════════════════════════
-# TOOL: search_files
-# ═══════════════════════════════════════════════════════════════
-def search_files(query: str, path: str = ".", file_pattern: str = "*") -> str:
-    """Поиск строки в файлах проекта."""
-    try:
-        full = _safe_path(path)
-        if not full.exists():
-            return f"[ERROR] Путь не найден: {path}"
+def tool_git_status(args: Dict[str, Any]) -> str:
+    return tool_run_command({"command": "git status --short", "cwd": str(PROJECT_ROOT)})
 
-        matches = []
-        q = query.lower()
+def tool_git_commit(args: Dict[str, Any]) -> str:
+    msg = args.get("message", "Atlas update")
+    r1 = tool_run_command({"command": "git add -A", "cwd": str(PROJECT_ROOT)})
+    r2 = tool_run_command({"command": f'git commit -m "{msg}"', "cwd": str(PROJECT_ROOT)})
+    return f"{r1}\n{r2}"
 
-        for fpath in full.rglob(file_pattern):
-            if fpath.is_file() and fpath.stat().st_size < 500 * 1024:
-                try:
-                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                        lines = f.readlines()
-                    for i, line in enumerate(lines, 1):
-                        if q in line.lower():
-                            rel = str(fpath.relative_to(PROJECT_ROOT)).replace("\\", "/")
-                            matches.append(f"  {rel}:{i}: {line.strip()}")
-                            if len(matches) >= 20:
-                                break
-                except Exception:
-                    pass
-            if len(matches) >= 20:
-                break
+def tool_backup_file(args: Dict[str, Any]) -> str:
+    path = _safe_path(_get_path_arg(args))
+    if not path.exists():
+        return f"❌ File not found: {path}"
+    backup_dir = PROJECT_ROOT / "Storage" / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    ts = int(time.time())
+    backup_path = backup_dir / f"{path.name}.{ts}.bak"
+    shutil.copy2(path, backup_path)
+    return f"💾 Backup: {backup_path}"
 
-        if not matches:
-            return f"[INFO] Совпадений не найдено для '{query}'"
-
-        return f"=== Поиск: '{query}' ===\n" + "\n".join(matches)
-    except Exception as e:
-        return f"[ERROR] {str(e)}"
-
-
-# ═══════════════════════════════════════════════════════════════
-# TOOL: git_diff
-# ═══════════════════════════════════════════════════════════════
-def git_diff() -> str:
-    """Показать git diff — что изменилось с последнего коммита."""
-    return run_command("git diff --stat && echo '---' && git diff", timeout=10)
-
-
-def git_status() -> str:
-    """Git status."""
-    return run_command("git status", timeout=10)
-
-
-def git_add_commit(message: str) -> str:
-    """git add -A && git commit -m 'message'."""
-    return run_command(f'git add -A && git commit -m "{message}"', timeout=10)
-
-
-# ═══════════════════════════════════════════════════════════════
-# TOOL: backup
-# ═══════════════════════════════════════════════════════════════
-def create_backup(name: Optional[str] = None) -> str:
-    """Создать бэкап проекта в Memory/backups/."""
-    try:
-        backup_dir = PROJECT_ROOT / "Memory" / "backups"
-        backup_dir.mkdir(parents=True, exist_ok=True)
-
-        timestamp = __import__('datetime').datetime.now().strftime("%Y%m%d_%H%M%S")
-        suffix = f"_{name}" if name else ""
-        dest = backup_dir / f"atlas_backup_{timestamp}{suffix}"
-
-        # Копируем всё кроме Memory/, .git/, node_modules/
-        ignore = shutil.ignore_patterns(
-            "Memory", ".git", "node_modules", "__pycache__",
-            "*.pyc", "*.pyo", ".venv", "venv"
-        )
-        shutil.copytree(PROJECT_ROOT, dest, ignore=ignore)
-
-        return f"[OK] Бэкап создан: {dest.name}"
-    except Exception as e:
-        return f"[ERROR] {str(e)}"
-
-
-# ═══════════════════════════════════════════════════════════════
-# TOOL: delete_file
-# ═══════════════════════════════════════════════════════════════
-def delete_file(path: str) -> str:
-    """Удалить файл."""
-    try:
-        full = _safe_path(path)
-        if not full.exists():
-            return f"[ERROR] Файл не найден: {path}"
-        full.unlink()
-        return f"[OK] Файл удалён: {path}"
-    except Exception as e:
-        return f"[ERROR] {str(e)}"
-
-
-# ═══════════════════════════════════════════════════════════════
-# РЕЕСТР ИНСТРУМЕНТОВ
-# ═══════════════════════════════════════════════════════════════
-TOOLS_REGISTRY = {
-    "read_file": read_file,
-    "write_file": write_file,
-    "edit_file": edit_file,
-    "list_directory": list_directory,
-    "run_command": run_command,
-    "search_files": search_files,
-    "git_diff": git_diff,
-    "git_status": git_status,
-    "git_add_commit": git_add_commit,
-    "create_backup": create_backup,
-    "delete_file": delete_file,
+TOOL_REGISTRY = {
+    "list_directory": tool_list_directory,
+    "read_file": tool_read_file,
+    "write_file": tool_write_file,
+    "create_file": tool_write_file,
+    "edit_file": tool_edit_file,
+    "run_command": tool_run_command,
+    "search_files": tool_search_files,
+    "git_status": tool_git_status,
+    "git_commit": tool_git_commit,
+    "backup_file": tool_backup_file,
 }
 
-
-def execute_tool(name: str, args: Dict) -> str:
-    """Выполнить инструмент по имени с аргументами."""
-    if name not in TOOLS_REGISTRY:
-        return f"[ERROR] Неизвестный инструмент: {name}. Доступные: {list(TOOLS_REGISTRY.keys())}"
-
-    tool = TOOLS_REGISTRY[name]
+def execute_tool(name: str, args: Dict[str, Any]) -> str:
+    if name not in TOOL_REGISTRY:
+        return f"❌ Unknown tool: {name}. Available: {list(TOOL_REGISTRY.keys())}"
     try:
-        return tool(**args)
-    except TypeError as e:
-        return f"[ERROR] Неверные аргументы для {name}: {str(e)}"
+        return TOOL_REGISTRY[name](args)
     except Exception as e:
-        return f"[ERROR] {str(e)}"
+        return f"❌ Tool error ({name}): {e}"
 
+def create_backup(name: Optional[str] = None) -> str:
+    backup_dir = PROJECT_ROOT / "Storage" / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    ts = int(time.time())
+    label = name or f"auto_{ts}"
+    backup_path = backup_dir / label
+    import tarfile
+    archive = backup_path.with_suffix(".tar.gz")
+    with tarfile.open(archive, "w:gz") as tar:
+        for item in PROJECT_ROOT.iterdir():
+            if item.name in (".git", "Storage", "__pycache__", ".venv", "venv"):
+                continue
+            tar.add(item, arcname=item.name)
+    return f"💾 Full backup: {archive}"
 
-# --- CLI тест ---
-if __name__ == "__main__":
-    print("=== Тест инструментов ===")
-    print(list_directory("atlas_core"))
-    print("\n---")
-    print(search_files("class SessionManager", "atlas_core"))
+def run_command(cmd: str, cwd: Optional[str] = None) -> str:
+    return tool_run_command({"command": cmd, "cwd": cwd or str(PROJECT_ROOT)})

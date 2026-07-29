@@ -1,25 +1,30 @@
 ﻿agents:
-  executive: [ollama, openrouter, cerebras, groq]
-  brief: [ollama, openrouter, cerebras, groq]
+  executive: [openrouter, groq, cloudflare, ollama]
+  brief: [openrouter, groq, cloudflare, ollama]
   developer: [ollama, openrouter, cloudflare]
-  self_upgrade: [ollama, openrouter, cerebras]
-  branding: [ollama, openrouter, cerebras]
+  self_upgrade: [openrouter, groq, ollama]
+  branding: [openrouter, groq, ollama]
   media: [ollama, openrouter, cloudflare]
+
+ollama_models:
+  executive: qwen2.5-coder:3b
+  brief: qwen2.5-coder:3b
+  developer: qwen2.5-coder:3b
+  self_upgrade: qwen2.5-coder:3b
+  branding: qwen2.5-coder:3b
+  media: qwen2.5-coder:3b
 
 providers:
   openrouter:
     model: google/gemini-2.5-pro-exp-03-25:free
     timeout: 30
-  cerebras:
-    model: llama-4-scout-17b-16e-instruct
-    timeout: 20
   groq:
     model: llama-3.3-70b-versatile
     timeout: 15
+  cloudflare:
+    model: "@cf/meta/llama-3.1-8b-instruct"
+    timeout: 20
   ollama:
     model_3b: qwen2.5-coder:3b
     model_7b: qwen2.5-coder:7b
     timeout: 60
-  cloudflare:
-    model: "@cf/meta/llama-3.1-8b-instruct"
-    timeout: 20

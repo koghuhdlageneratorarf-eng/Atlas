@@ -2,7 +2,6 @@
 import os
 import sys
 sys.stdout.reconfigure(encoding='utf-8')
-import sys
 import json
 import time
 import requests
@@ -20,8 +19,12 @@ except ImportError:
 
 # Load env
 env_path = Path(__file__).parent / ".env"
+print(f"[DEBUG] Looking for .env at: {env_path}")
+print(f"[DEBUG] .env exists: {env_path.exists()}")
 if env_path.exists():
-    load_dotenv(env_path)
+    load_dotenv(env_path, override=True)
+    print(f"[DEBUG] OPENROUTER_KEY loaded: {'yes' if os.getenv('OPENROUTER_API_KEY') else 'no'}")
+    print(f"[DEBUG] GROQ_KEY loaded: {'yes' if os.getenv('GROQ_API_KEY') else 'no'}")
 
 # Config
 CONFIG_PATH = Path(__file__).parent / "models.yaml"
@@ -51,11 +54,11 @@ PROVIDERS = {
         "payload": lambda msg: {"contents": [{"role": m["role"], "parts": [{"text": m["content"]}]} for m in msg], "generationConfig": {"temperature": 0.3}},
         "extract": lambda r: r["candidates"][0]["content"]["parts"][0]["text"]
     },
-    "cerebras": {
+     "cerebras": {
         "url": "https://api.cerebras.ai/v1/chat/completions",
         "key": CEREBRAS_KEY,
         "header": lambda k: {"Authorization": f"Bearer {k}"},
-        "payload": lambda msg: {"model": "llama-4-scout-17b-16e-instruct", "messages": msg, "temperature": 0.3},
+        "payload": lambda msg: {"model": "llama-3.1-8b", "messages": msg, "temperature": 0.3},
         "extract": lambda r: r["choices"][0]["message"]["content"]
     },
     "groq": {
@@ -89,7 +92,7 @@ PROVIDERS = {
 }
 
 def _call_provider(name: str, messages: list, timeout: int = 60) -> str:
-    """Вызвать конкретного провайдера."""
+    """Call a specific provider."""
     cfg = PROVIDERS[name]
     if not cfg["key"]:
         raise ValueError(f"No API key for {name}")
@@ -104,10 +107,13 @@ def _call_provider(name: str, messages: list, timeout: int = 60) -> str:
 
     response = requests.post(url, headers=headers, json=cfg["payload"](messages), timeout=timeout)
     response.raise_for_status()
-    return cfg["extract"](response.json())
+    result = cfg["extract"](response.json())
+    if isinstance(result, dict):
+        result = json.dumps(result, ensure_ascii=False)
+    return result
 
 def _call_ollama(messages: list, model: str = DEFAULT_MODEL, timeout: int = 120) -> str:
-    """Fallback на локальную Ollama."""
+    """Fallback to local Ollama."""
     response = requests.post(
         OLLAMA_URL,
         json={"model": model, "messages": messages, "stream": False},
@@ -116,38 +122,53 @@ def _call_ollama(messages: list, model: str = DEFAULT_MODEL, timeout: int = 120)
     response.raise_for_status()
     return response.json()["message"]["content"]
 
+def _inject_graphify_context(messages: list, task: str = "") -> list:
+    """
+    Inject Graphify context into the LAST user message instead of adding a system message.
+    This preserves the single-system-message pattern that works reliably with all models.
+    """
+    if not GRAPHIFY_AVAILABLE or not task:
+        return messages
+
+    context = graphify_context(task, max_nodes=10)
+    if not context:
+        return messages
+
+    context_block = f"\n=== PROJECT CONTEXT ===\n{context}\n=== END CONTEXT ===\nUse this info. Don't create files/folders that already exist."
+
+    # Find last user message and append context
+    new_messages = []
+    last_user_idx = -1
+    for i, m in enumerate(messages):
+        if m["role"] == "user":
+            last_user_idx = i
+
+    for i, m in enumerate(messages):
+        if i == last_user_idx and last_user_idx >= 0:
+            new_messages.append({
+                "role": "user",
+                "content": m["content"] + "\n" + context_block
+            })
+        else:
+            new_messages.append(m)
+
+    return new_messages
+
 def ask_llm(messages: list, agent: str = "developer", use_graph: bool = True, timeout: int = 120) -> str:
     """
-    Умный роутер с авто-контекстом из Graphify.
+    Smart router with Graphify context injected into user message (not system).
     
     Args:
-        messages: список сообщений
+        messages: list of messages
         agent: "executive", "brief", "developer", "self_upgrade"
-        use_graph: подгружать ли контекст из Graphify
+        use_graph: whether to load Graphify context
     """
-    # 1. Подгружаем контекст из Graphify
+    # 1. Inject Graphify context into last user message (NOT as system message)
     if use_graph and GRAPHIFY_AVAILABLE:
         task = messages[-1].get("content", "") if messages else ""
-        context = graphify_context(task, max_nodes=12)
-        if context:
-            context_msg = {
-                "role": "system",
-                "content": f"=== КОНТЕКСТ ПРОЕКТА ATLAS ===\n{context}\n=== КОНЕЦ КОНТЕКСТА ===\n\nИспользуй эту информацию. Не предлагай создавать файлы/папки, которые уже существуют."
-            }
-            new_messages = []
-            has_system = False
-            for m in messages:
-                if m["role"] == "system" and not has_system:
-                    new_messages.append(m)
-                    new_messages.append(context_msg)
-                    has_system = True
-                else:
-                    new_messages.append(m)
-            if not has_system:
-                new_messages = [context_msg] + messages
-            messages = new_messages
+        messages = _inject_graphify_context(messages, task)
 
-    # 2. Определяем приоритеты провайдеров для агента
+    # 2. Provider priorities for agent
     priorities = MODELS_CONFIG.get("agents", {}).get(agent, ["ollama"])
     ollama_models = MODELS_CONFIG.get("ollama_models", {})
 
@@ -156,7 +177,7 @@ def ask_llm(messages: list, agent: str = "developer", use_graph: bool = True, ti
         if provider == "ollama":
             try:
                 model = ollama_models.get(agent, DEFAULT_MODEL)
-                print(f"[Brain] {agent} → Ollama ({model})")
+                print(f"[Brain] {agent} -> Ollama ({model})")
                 return _call_ollama(messages, model, timeout)
             except Exception as e:
                 last_error = e
@@ -165,7 +186,7 @@ def ask_llm(messages: list, agent: str = "developer", use_graph: bool = True, ti
 
         if provider in PROVIDERS:
             try:
-                print(f"[Brain] {agent} → {provider.upper()}")
+                print(f"[Brain] {agent} -> {provider.upper()}")
                 return _call_provider(provider, messages, timeout)
             except Exception as e:
                 last_error = e
@@ -175,7 +196,7 @@ def ask_llm(messages: list, agent: str = "developer", use_graph: bool = True, ti
     raise RuntimeError(f"All providers failed. Last error: {last_error}")
 
 def diagnose():
-    """Проверяет всех провайдеров."""
+    """Check all providers."""
     print("=" * 50)
     print("ATLAS BRAIN DIAGNOSTIC")
     print("=" * 50)
@@ -189,7 +210,7 @@ def diagnose():
 
     print("\n[PROVIDERS]")
     for name, cfg in PROVIDERS.items():
-        status = "✅ KEY OK" if cfg["key"] else "❌ NO KEY"
+        status = "OK" if cfg["key"] else "NO KEY"
         print(f"  [{name.upper()}] {status}")
 
     print("\n[MODELS CONFIG]")
@@ -197,7 +218,7 @@ def diagnose():
         print(f"  Agents: {list(MODELS_CONFIG.get('agents', {}).keys())}")
         print(f"  Ollama models: {MODELS_CONFIG.get('ollama_models', {})}")
     else:
-        print("  ❌ models.yaml not found or empty")
+        print("  models.yaml not found or empty")
 
     print("\n[OLLAMA]")
     try:
@@ -208,7 +229,7 @@ def diagnose():
         print(f"  Error: {e}")
 
     # Test each provider
-    test_msg = [{"role": "user", "content": "Say 'OK' only"}]
+    test_msg = [{"role": "system", "content": "You are Atlas."}, {"role": "user", "content": "Say 'OK' only"}]
     print("\n[PROVIDER TESTS]")
     for name in PROVIDERS:
         if PROVIDERS[name]["key"]:
@@ -216,9 +237,9 @@ def diagnose():
                 start = time.time()
                 result = _call_provider(name, test_msg, timeout=30)
                 elapsed = time.time() - start
-                print(f"  ✅ {name.upper()}: {result[:50]}... ({elapsed:.1f}s)")
+                print(f"  OK {name.upper()}: {result[:50]}... ({elapsed:.1f}s)")
             except Exception as e:
-                print(f"  ❌ {name.upper()}: {e}")
+                print(f"  FAIL {name.upper()}: {e}")
 
 if __name__ == "__main__":
     import argparse
@@ -230,14 +251,17 @@ if __name__ == "__main__":
     if args.diagnose:
         diagnose()
     elif args.test:
-        msg = [{"role": "user", "content": "Привет, это тест Atlas Brain. Ответь кратко."}]
+        msg = [
+            {"role": "system", "content": "You are Atlas coding agent."},
+            {"role": "user", "content": "Say 'OK' only"}
+        ]
         if args.test == "ollama":
             print(_call_ollama(msg))
         else:
             print(_call_provider(args.test, msg))
     else:
         result = ask_llm(
-            [{"role": "user", "content": "Какие skills доступны для создания сайтов?"}],
+            [{"role": "user", "content": "What skills are available for building websites?"}],
             agent="executive"
         )
         print(result)

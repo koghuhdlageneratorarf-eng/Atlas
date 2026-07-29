@@ -5,7 +5,7 @@ atlas_core — Ядро Atlas Code Agent
 
 from .session import SessionManager
 from .context import ProjectContext
-from .tools import execute_tool, TOOLS_REGISTRY
+from .tools import execute_tool, TOOL_REGISTRY
 
 __all__ = [
     "SessionManager",
