@@ -8,6 +8,7 @@ import os
 import json
 from pathlib import Path
 from typing import List, Dict, Optional, Set
+from core.symbol_resolver import SymbolResolver
 
 # Исключаем из контекста
 EXCLUDE_DIRS: Set[str] = {
@@ -227,6 +228,10 @@ class ProjectContext:
                         "matches": matches[:5]  # макс 5 совпадений на файл
                     })
         return results
+    def get_symbols(self, filepath: str):
+        from core.symbol_resolver import SymbolResolver
+        resolver = SymbolResolver()
+        return resolver.get_symbols(filepath)
 
 
 # --- CLI тест ---

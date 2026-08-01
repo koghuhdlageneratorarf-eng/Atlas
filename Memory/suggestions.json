@@ -1,0 +1,25 @@
+[
+  {
+    "title": "Roadmap: Runtime Engine",
+    "description": "Реализовать: Runtime Engine (из roadmap, этап Foundation)",
+    "why": "По плану roadmap (приоритет P0)",
+    "priority": "high",
+    "effort": "medium",
+    "timestamp": "now",
+    "status": "applied",
+    "files": [],
+    "_roadmap_task_id": "runtime",
+    "applied_at": "2026-07-30T23:11:24.005891"
+  },
+  {
+    "title": "Roadmap: Runtime Engine",
+    "description": "Реализовать: Runtime Engine (из roadmap, этап Foundation)",
+    "why": "По плану roadmap (приоритет P0)",
+    "priority": "high",
+    "effort": "medium",
+    "timestamp": "now",
+    "status": "new",
+    "files": [],
+    "_roadmap_task_id": "runtime"
+  }
+]

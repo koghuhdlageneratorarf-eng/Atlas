@@ -1,10 +1,10 @@
 ﻿agents:
-  executive: [openrouter, groq, cloudflare, ollama]
-  brief: [openrouter, groq, cloudflare, ollama]
-  developer: [ollama, openrouter, cloudflare]
+  executive: [openrouter, groq, cloudflare]
+  brief: [openrouter, groq, cloudflare]
+  developer: [openrouter, groq, ollama]
   self_upgrade: [openrouter, groq, ollama]
   branding: [openrouter, groq, ollama]
-  media: [ollama, openrouter, cloudflare]
+  media: [openrouter, groq, ollama]
 
 ollama_models:
   executive: qwen2.5-coder:3b

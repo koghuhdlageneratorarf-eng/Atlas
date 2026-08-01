@@ -112,11 +112,27 @@ def _call_provider(name: str, messages: list, timeout: int = 60) -> str:
         result = json.dumps(result, ensure_ascii=False)
     return result
 
+def _compress_messages(messages: list, max_chars: int = 6000) -> list:
+    """Compress context for 3b models."""
+    total = sum(len(m.get("content", "")) for m in messages)
+    if total <= max_chars:
+        return messages
+    system_msgs = [m for m in messages if m.get("role") == "system"]
+    other_msgs = [m for m in messages if m.get("role") != "system"]
+    return system_msgs + other_msgs[-3:]
+
 def _call_ollama(messages: list, model: str = DEFAULT_MODEL, timeout: int = 120) -> str:
-    """Fallback to local Ollama."""
+    """Ollama with JSON format guarantee."""
+    compressed = _compress_messages(messages)
     response = requests.post(
         OLLAMA_URL,
-        json={"model": model, "messages": messages, "stream": False},
+        json={
+            "model": model,
+            "messages": compressed,
+            "stream": False,
+            "format": "json",
+            "options": {"temperature": 0.1, "num_predict": 2048}
+        },
         timeout=timeout
     )
     response.raise_for_status()

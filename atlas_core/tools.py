@@ -66,6 +66,7 @@ def tool_list_directory(args: Dict[str, Any]) -> str:
 
 def tool_read_file(args: Dict[str, Any]) -> str:
     path = _safe_path(_get_path_arg(args))
+    print(f"[WRITE DEBUG] path={path}")
     if not path.exists():
         return f"❌ File not found: {path}"
     try:
@@ -163,6 +164,20 @@ def tool_backup_file(args: Dict[str, Any]) -> str:
     shutil.copy2(path, backup_path)
     return f"💾 Backup: {backup_path}"
 
+def tool_rollback(args: Dict[str, Any]) -> str:
+    """Откат к последнему бэкапу."""
+    backup_dir = PROJECT_ROOT / "Storage" / "backups"
+    if not backup_dir.exists():
+        return "❌ Нет бэкапов"
+    backups = sorted(backup_dir.glob("*.tar.gz"), key=os.path.getmtime, reverse=True)
+    if not backups:
+        return "❌ Нет бэкапов"
+    latest = backups[0]
+    import tarfile
+    with tarfile.open(latest, "r:gz") as tar:
+        tar.extractall(path=PROJECT_ROOT)
+    return f"✅ Откат к {latest.name}"
+    
 TOOL_REGISTRY = {
     "list_directory": tool_list_directory,
     "read_file": tool_read_file,
@@ -174,6 +189,7 @@ TOOL_REGISTRY = {
     "git_status": tool_git_status,
     "git_commit": tool_git_commit,
     "backup_file": tool_backup_file,
+    "rollback": tool_rollback, 
 }
 
 def execute_tool(name: str, args: Dict[str, Any]) -> str:
@@ -201,3 +217,17 @@ def create_backup(name: Optional[str] = None) -> str:
 
 def run_command(cmd: str, cwd: Optional[str] = None) -> str:
     return tool_run_command({"command": cmd, "cwd": cwd or str(PROJECT_ROOT)})
+
+def tool_rollback(args: Dict[str, Any]) -> str:
+    """Откат к последнему бэкапу."""
+    backup_dir = PROJECT_ROOT / "Storage" / "backups"
+    if not backup_dir.exists():
+        return "❌ Нет бэкапов"
+    backups = sorted(backup_dir.glob("*.tar.gz"), key=os.path.getmtime, reverse=True)
+    if not backups:
+        return "❌ Нет бэкапов"
+    latest = backups[0]
+    import tarfile
+    with tarfile.open(latest, "r:gz") as tar:
+        tar.extractall(path=PROJECT_ROOT)
+    return f"✅ Откат к {latest.name}"

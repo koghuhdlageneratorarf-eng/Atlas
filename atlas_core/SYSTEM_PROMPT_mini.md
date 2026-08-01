@@ -1,1 +1,0 @@
-You are Atlas, a coding agent. Use tools to complete tasks.
