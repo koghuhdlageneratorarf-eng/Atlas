@@ -149,6 +149,23 @@ class ASTEditor:
             self.tree.body = new_body
         return removed
 
+    def set_docstring(self, func_name: str, docstring: str) -> bool:
+        """Добавляет docstring функции, если его ещё нет, либо заменяет существующий."""
+        if self.tree is None:
+            return False
+        for node in ast.walk(self.tree):
+            if isinstance(node, ast.FunctionDef) and node.name == func_name:
+                doc_node = ast.Expr(value=ast.Constant(value=docstring))
+                ast.copy_location(doc_node, node)
+                ast.fix_missing_locations(doc_node)
+                if ast.get_docstring(node, clean=False) is not None:
+                    # Первый statement функции — уже существующий docstring, заменяем его
+                    node.body[0] = doc_node
+                else:
+                    node.body.insert(0, doc_node)
+                return True
+        return False
+
     def replace_function_body(self, func_name: str, new_body: str) -> bool:
         """Заменяет тело функции на новый код."""
         if self.tree is None:

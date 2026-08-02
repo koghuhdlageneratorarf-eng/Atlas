@@ -4,6 +4,7 @@ Self Debugging System — автономное исправление ошибо
 
 import sys
 import re
+import ast
 import subprocess
 import json
 import difflib
@@ -154,8 +155,9 @@ class SelfDebugger:
             from core.ast_editor import ASTEditor
             editor = ASTEditor(str(PROJECT_ROOT))
             if editor.load(filepath):
+                original_source = editor.source  # содержимое ДО любых правок
+
                 if error_type == "NameError":
-                    import re
                     match = re.search(r"name '(\w+)' is not defined", message)
                     if match:
                         func_name = match.group(1)
@@ -163,20 +165,55 @@ class SelfDebugger:
                             # Добавляем функцию
                             func_code = f"def {func_name}():\n    pass"
                             if editor.add_function(func_code):
+                                new_content = ast.unparse(editor.tree)
                                 if editor.save():
-                                    import difflib
-                                    content = Path(filepath).read_text(encoding='utf-8')
-                                    original = Path(filepath).read_text(encoding='utf-8')
                                     diff = difflib.unified_diff(
-                                        original.splitlines(keepends=True),
-                                        content.splitlines(keepends=True),
+                                        original_source.splitlines(keepends=True),
+                                        new_content.splitlines(keepends=True),
                                         fromfile=filepath,
                                         tofile=filepath
                                     )
                                     diff_str = "".join(diff)
                                     if diff_str.strip():
                                         print(f"[SelfDebug] ✅ AST: добавлена функция {func_name}")
+                                        self._last_full_content = new_content
                                         return diff_str
+
+                # === DOCSTRING FIX (задачи вида "добавь docstring для функции X") ===
+                if message and "docstring" in message.lower():
+                    func_match = (
+                        re.search(r"функци[а-я]*\s+(\w+)", message, re.IGNORECASE)
+                        or re.search(r"function\s+(\w+)", message, re.IGNORECASE)
+                    )
+                    if func_match:
+                        func_name = func_match.group(1)
+                        if func_name in editor.get_functions():
+                            try:
+                                doc_prompt = (
+                                    f"Напиши краткий docstring (1-3 строки, на русском языке) "
+                                    f"для функции {func_name} из файла {filepath}. "
+                                    f"Ответь ТОЛЬКО текстом docstring, без кавычек и markdown."
+                                )
+                                doc_text = ask_llm(
+                                    [{"role": "user", "content": doc_prompt}],
+                                    agent="executive"
+                                ).strip().strip('"').strip("'").strip("`")
+                                if doc_text and editor.set_docstring(func_name, doc_text):
+                                    new_content = ast.unparse(editor.tree)
+                                    if editor.save():
+                                        diff = difflib.unified_diff(
+                                            original_source.splitlines(keepends=True),
+                                            new_content.splitlines(keepends=True),
+                                            fromfile=filepath,
+                                            tofile=filepath
+                                        )
+                                        diff_str = "".join(diff)
+                                        if diff_str.strip():
+                                            print(f"[SelfDebug] ✅ AST: добавлен docstring для {func_name}")
+                                            self._last_full_content = new_content
+                                            return diff_str
+                            except Exception as e:
+                                print(f"[SelfDebug] Docstring попытка: {e}")
         except Exception as e:
             print(f"[SelfDebug] AST попытка: {e}")
 
@@ -259,7 +296,6 @@ class SelfDebugger:
             if fixed_code.strip() == content_normalized.strip():
                 return None
 
-            import difflib
             diff = difflib.unified_diff(
                 content.splitlines(keepends=True),
                 fixed_code.splitlines(keepends=True),
