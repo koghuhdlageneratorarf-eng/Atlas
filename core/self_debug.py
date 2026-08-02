@@ -140,6 +140,36 @@ class SelfDebugger:
                 errors.append({"line": line, "raw": log_lines})
         return errors
 
+    def _extract_docstring_text(self, raw: str) -> str:
+        """Достаёт чистый текст docstring из ответа модели.
+
+        Некоторые модели (особенно локальные, вроде qwen2.5-coder через
+        Ollama, если системный промпт проекта учит их отвечать в JSON)
+        оборачивают простой текст в JSON-структуру вида
+        {"name": "...", "description": "..."} вместо того, чтобы просто
+        вернуть текст docstring. Эта функция пытается достать полезный
+        текст из такой обёртки, а если это обычный текст — просто чистит
+        кавычки/markdown по краям.
+        """
+        text = raw.strip()
+
+        # Убираем возможные markdown-ограждения ```...```
+        if text.startswith("```"):
+            text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
+            text = re.sub(r"\n?```$", "", text).strip()
+
+        # Если похоже на JSON — пробуем достать осмысленное поле
+        if text.startswith("{"):
+            try:
+                data = json.loads(text)
+                for key in ("docstring", "description", "doc", "text"):
+                    if isinstance(data.get(key), str) and data[key].strip():
+                        return data[key].strip()
+            except Exception:
+                pass  # не распарсилось — используем как обычный текст ниже
+
+        return text.strip('"').strip("'").strip("`")
+
     def generate_fix(self, error_info: Dict, previous_attempts: List[str] = None) -> Optional[str]:
         self._last_full_content = None
         filepath = error_info.get("file")
@@ -182,8 +212,8 @@ class SelfDebugger:
                 # === DOCSTRING FIX (задачи вида "добавь docstring для функции X") ===
                 if message and "docstring" in message.lower():
                     func_match = (
-                        re.search(r"функци[а-я]*\s+(\w+)", message, re.IGNORECASE)
-                        or re.search(r"function\s+(\w+)", message, re.IGNORECASE)
+                        re.search(r"функци[а-я]*\W+(\w+)", message, re.IGNORECASE)
+                        or re.search(r"function\W+(\w+)", message, re.IGNORECASE)
                     )
                     if func_match:
                         func_name = func_match.group(1)
@@ -194,10 +224,11 @@ class SelfDebugger:
                                     f"для функции {func_name} из файла {filepath}. "
                                     f"Ответь ТОЛЬКО текстом docstring, без кавычек и markdown."
                                 )
-                                doc_text = ask_llm(
+                                raw_doc = ask_llm(
                                     [{"role": "user", "content": doc_prompt}],
                                     agent="executive"
-                                ).strip().strip('"').strip("'").strip("`")
+                                ).strip()
+                                doc_text = self._extract_docstring_text(raw_doc)
                                 if doc_text and editor.set_docstring(func_name, doc_text):
                                     new_content = ast.unparse(editor.tree)
                                     if editor.save():

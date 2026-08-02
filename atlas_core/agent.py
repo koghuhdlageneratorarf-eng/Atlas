@@ -17,6 +17,9 @@ _runtime = None
 _server_pid = None
 
 def get_atlas_runtime():
+    """{
+    "get_atlas_runtime": "Возвращает текущую версию Atlas Runtime, используемую в текущей сессии."
+}"""
     global _runtime
     if _runtime is None:
         _runtime = get_runtime()
@@ -751,10 +754,7 @@ def handle_command(cmd: str, agent: AtlasCodeAgent) -> str | None:
     return None
 
 def main():
-    """{
-    "name": "main",
-    "description": "Запускает основной цикл агента Atlas, обрабатывающий входные запросы и отвечая на них."
-}"""
+    """Запускает основной цикл агента Atlas, обрабатывающий входные запросы и отвечая на них."""
     print_welcome()
     session_name = 'default'
     agent = AtlasCodeAgent(session_name, agent_type='developer')
