@@ -3,10 +3,9 @@ Developer Agent — universal. Ispolzuet lyuboy skill iz papki Skills/.
 Avtomaticheski dobavlyaet AOS.js dlya animatsiy.
 """
 
-import sys
-import re
 import json
 import shutil
+import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Config"))
@@ -17,7 +16,7 @@ DEFAULT_SKILL = "modern_landing"
 
 AOS_CSS = '<link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">'
 AOS_JS = '<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>'
-AOS_INIT = '<script>AOS.init({duration:800,once:true});</script>'
+AOS_INIT = "<script>AOS.init({duration:800,once:true});</script>"
 
 
 def inject_aos(html_code: str):
@@ -25,14 +24,18 @@ def inject_aos(html_code: str):
     # CSS v <head>
     if "</head>" in html_code and AOS_CSS not in html_code:
         html_code = html_code.replace("</head>", f"    {AOS_CSS}\n</head>")
-    
+
     # JS i init pered </body>
     if "</body>" in html_code:
         if AOS_JS not in html_code:
-            html_code = html_code.replace("</body>", f"    {AOS_JS}\n    {AOS_INIT}\n</body>")
+            html_code = html_code.replace(
+                "</body>", f"    {AOS_JS}\n    {AOS_INIT}\n</body>"
+            )
     elif "</html>" in html_code:
-        html_code = html_code.replace("</html>", f"    {AOS_JS}\n    {AOS_INIT}\n</html>")
-    
+        html_code = html_code.replace(
+            "</html>", f"    {AOS_JS}\n    {AOS_INIT}\n</html>"
+        )
+
     return html_code
 
 
@@ -67,7 +70,7 @@ def fill_template(task: str, template: str, brief: str = None):
     context = f"ZAPROS POLZOVATELYA:\n{task}\n"
     if brief:
         context += f"\nTEKHNICHESKOE ZADANIE:\n{brief}\n"
-    
+
     prompt = f"""Ty — professionalnyy veb-razrabotchik.
 U tebya est gotovyy shablon HTML-sayta.
 Zapolni ego realnym kontentom.
@@ -87,20 +90,17 @@ PRAVILA:
 7. Verni TOLKO gotovyy HTML-kod, bez obyasneniy.
 
 Gotovyy HTML:"""
-    
+
     messages = [{"role": "user", "content": prompt}]
     print("   Zapolnenie shablona...")
     html_code = ask_llm(messages, agent="developer")
-    
+
     html_code = html_code.strip()
-    if html_code.startswith("```html"):
-        html_code = html_code[7:]
-    if html_code.startswith("```"):
-        html_code = html_code[3:]
-    if html_code.endswith("```"):
-        html_code = html_code[:-3]
+    html_code = html_code.removeprefix("```html")
+    html_code = html_code.removeprefix("```")
+    html_code = html_code.removesuffix("```")
     html_code = html_code.strip()
-    
+
     return html_code
 
 
@@ -136,13 +136,15 @@ def run_developer(task: str, project_dir: str, skill_name: str = None):
     index_file.write_text(html_code, encoding="utf-8")
     print(f"   Sohranen: {index_file}")
 
-    print(f"\nGotovo! Otkroy fayl v brauzere:")
+    print("\nGotovo! Otkroy fayl v brauzere:")
     print(f"   {index_file.absolute()}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print('Ispolzovanie: python Agents/developer.py "zadacha" ./put_k_proektu [skill_name]')
+        print(
+            'Ispolzovanie: python Agents/developer.py "zadacha" ./put_k_proektu [skill_name]'
+        )
         sys.exit(1)
 
     task_arg = sys.argv[1]

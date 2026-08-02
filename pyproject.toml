@@ -1,0 +1,15 @@
+[tool.pyright]
+include = ["atlas_core", "core", "Agents", "Config", "Brain", "evolution"]
+exclude = ["**/__pycache__", "**/node_modules", "**/venv", "**/.venv", "**/Storage"]
+
+reportMissingImports = false
+reportOptionalMemberAccess = false
+reportOptionalSubscript = false
+reportGeneralTypeIssues = false
+reportRedeclaration = false
+reportArgumentType = false
+reportAssignmentType = false
+reportReturnType = false
+reportAttributeAccessIssue = false
+reportUnboundVariable = false
+reportPossiblyUnboundVariable = false

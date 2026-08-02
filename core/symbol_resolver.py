@@ -1,10 +1,13 @@
 """
 Symbol Resolver для Atlas на основе Jedi.
 """
-import jedi
+
 from pathlib import Path
 
+import jedi
+
 PROJECT_ROOT = Path(__file__).parent.parent
+
 
 class SymbolResolver:
     def __init__(self, project_path: str = None):
@@ -16,7 +19,7 @@ class SymbolResolver:
         full_path = self.project_path / filepath
         if not full_path.exists():
             return None
-        with open(full_path, 'r', encoding='utf-8') as f:
+        with open(full_path, "r", encoding="utf-8") as f:
             code = f.read()
         self.script = jedi.Script(code, path=str(full_path))
         return self.script
@@ -58,6 +61,7 @@ class SymbolResolver:
             if n.name == symbol_name:
                 return n
         return None
+
 
 if __name__ == "__main__":
     resolver = SymbolResolver()

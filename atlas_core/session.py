@@ -3,11 +3,9 @@ atlas_core/session.py — SQLite память сессии Atlas Code Agent
 Сохраняет историю сообщений между перезапусками.
 """
 
-import sqlite3
 import json
-import datetime
+import sqlite3
 from pathlib import Path
-from typing import List, Dict, Optional
 
 DB_PATH = Path(__file__).parent.parent / "Memory" / "atlas_sessions.db"
 
@@ -50,16 +48,14 @@ class SessionManager:
     def _get_or_create_session(self) -> int:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.execute(
-            "SELECT id FROM sessions WHERE session_name = ?",
-            (self.session_name,)
+            "SELECT id FROM sessions WHERE session_name = ?", (self.session_name,)
         )
         row = cursor.fetchone()
         if row:
             sid = row[0]
         else:
             cursor = conn.execute(
-                "INSERT INTO sessions (session_name) VALUES (?)",
-                (self.session_name,)
+                "INSERT INTO sessions (session_name) VALUES (?)", (self.session_name,)
             )
             sid = cursor.lastrowid
             conn.commit()
@@ -70,8 +66,8 @@ class SessionManager:
         self,
         role: str,
         content: str,
-        tool_calls: Optional[List[Dict]] = None,
-        tool_call_id: Optional[str] = None
+        tool_calls: list[dict] | None = None,
+        tool_call_id: str | None = None,
     ):
         """Добавить сообщение в сессию."""
         conn = sqlite3.connect(DB_PATH)
@@ -83,17 +79,17 @@ class SessionManager:
                 role,
                 content,
                 json.dumps(tool_calls, ensure_ascii=False) if tool_calls else None,
-                tool_call_id
-            )
+                tool_call_id,
+            ),
         )
         conn.execute(
             "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (self.session_id,)
+            (self.session_id,),
         )
         conn.commit()
         conn.close()
 
-    def get_history(self, limit: int = 50) -> List[Dict]:
+    def get_history(self, limit: int = 50) -> list[dict]:
         """Получить последние N сообщений сессии."""
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.execute(
@@ -102,7 +98,7 @@ class SessionManager:
                WHERE session_id = ?
                ORDER BY timestamp ASC
                LIMIT ?""",
-            (self.session_id, limit)
+            (self.session_id, limit),
         )
         rows = cursor.fetchall()
         conn.close()
@@ -124,7 +120,7 @@ class SessionManager:
         conn.commit()
         conn.close()
 
-    def list_sessions(self) -> List[Dict]:
+    def list_sessions(self) -> list[dict]:
         """Список всех сессий."""
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.execute(

@@ -1,20 +1,23 @@
 ﻿"""Graphify Bridge — адаптер между Atlas и Graphify knowledge graph."""
+
 import json
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Any, Optional
 
 BASE_DIR = Path(__file__).parent.parent
 GRAPHIFY_OUT = BASE_DIR / "graphify-out"
 GRAPH_JSON = GRAPHIFY_OUT / "graph.json"
 GRAPH_REPORT = GRAPHIFY_OUT / "GRAPH_REPORT.md"
 
-GRAPHIFY_EXE = r"C:\Users\diman\AppData\Local\Python\pythoncore-3.14-64\Scripts\graphify.exe"
+GRAPHIFY_EXE = (
+    r"C:\Users\diman\AppData\Local\Python\pythoncore-3.14-64\Scripts\graphify.exe"
+)
+
 
 class GraphifyBridge:
     def __init__(self):
-        self._graph: Optional[Dict] = None
-        self._report: Optional[str] = None
+        self._graph: dict | None = None
+        self._report: str | None = None
 
     def _needs_rebuild(self) -> bool:
         if not GRAPH_JSON.exists():
@@ -25,8 +28,7 @@ class GraphifyBridge:
             if f.is_file() and ".git" not in str(f) and "graphify-out" not in str(f):
                 try:
                     mtime = f.stat().st_mtime
-                    if mtime > latest:
-                        latest = mtime
+                    latest = max(latest, mtime)
                 except:
                     pass
         return latest > graph_mtime
@@ -48,7 +50,7 @@ class GraphifyBridge:
             [GRAPHIFY_EXE, ".", "--output", str(GRAPHIFY_OUT), "--code-only"],
             cwd=str(BASE_DIR),
             capture_output=True,
-            text=True
+            text=True,
         )
 
         if result.returncode != 0:
@@ -66,12 +68,14 @@ class GraphifyBridge:
         for f in BASE_DIR.rglob("*.py"):
             rel = str(f.relative_to(BASE_DIR)).replace("\\", "/")
             parts = f.relative_to(BASE_DIR).parts
-            nodes.append({
-                "id": rel,
-                "type": "file",
-                "label": f.name,
-                "community": parts[0] if parts else "root"
-            })
+            nodes.append(
+                {
+                    "id": rel,
+                    "type": "file",
+                    "label": f.name,
+                    "community": parts[0] if parts else "root",
+                }
+            )
 
         for node in nodes:
             fpath = BASE_DIR / node["id"]
@@ -83,21 +87,27 @@ class GraphifyBridge:
                         parts = line.split()
                         if len(parts) >= 2:
                             target = parts[1].split(".")[0]
-                            if not target.startswith(("os", "sys", "json", "time", "pathlib", "typing")):
+                            if not target.startswith(
+                                ("os", "sys", "json", "time", "pathlib", "typing")
+                            ):
                                 for n in nodes:
                                     if target in n["label"].replace(".py", ""):
-                                        edges.append({
-                                            "source": node["id"],
-                                            "target": n["id"],
-                                            "relation": "imports",
-                                            "confidence": "EXTRACTED"
-                                        })
+                                        edges.append(
+                                            {
+                                                "source": node["id"],
+                                                "target": n["id"],
+                                                "relation": "imports",
+                                                "confidence": "EXTRACTED",
+                                            }
+                                        )
             except:
                 pass
 
         self._graph = {"nodes": nodes, "edges": edges}
         GRAPHIFY_OUT.mkdir(exist_ok=True)
-        GRAPH_JSON.write_text(json.dumps(self._graph, indent=2, ensure_ascii=False), encoding="utf-8")
+        GRAPH_JSON.write_text(
+            json.dumps(self._graph, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
     def _load(self):
         if GRAPH_JSON.exists():
@@ -135,13 +145,17 @@ class GraphifyBridge:
                             lines.append(f"    Технологии: {tech}")
                             lines.append(f"    Entry point: {entry}")
                         except Exception as e:
-                            lines.append(f"\n  • {skill_folder.name}: (ошибка чтения: {e})")
+                            lines.append(
+                                f"\n  • {skill_folder.name}: (ошибка чтения: {e})"
+                            )
                     else:
                         tmpl = skill_folder / "template.html"
                         if tmpl.exists():
                             lines.append(f"\n  • {skill_folder.name}: HTML-шаблон")
                         else:
-                            lines.append(f"\n  • {skill_folder.name}: (папка без skill.json)")
+                            lines.append(
+                                f"\n  • {skill_folder.name}: (папка без skill.json)"
+                            )
 
         return "\n".join(lines)
 
@@ -177,11 +191,25 @@ class GraphifyBridge:
         edges = self._graph.get("edges", [])
 
         skills_catalog = ""
-        if any(word in query_lower for word in ["skill", "скилл", "шаблон", "template", "landing", "сайт", "web"]):
+        if any(
+            word in query_lower
+            for word in [
+                "skill",
+                "скилл",
+                "шаблон",
+                "template",
+                "landing",
+                "сайт",
+                "web",
+            ]
+        ):
             skills_catalog = self._get_skills_catalog()
 
         agents_catalog = ""
-        if any(word in query_lower for word in ["agent", "агент", "executive", "developer", "brief"]):
+        if any(
+            word in query_lower
+            for word in ["agent", "агент", "executive", "developer", "brief"]
+        ):
             agents_catalog = self._get_agents_catalog()
 
         relevant = []
@@ -214,7 +242,9 @@ class GraphifyBridge:
             if edge.get("source") in top_ids or edge.get("target") in top_ids:
                 neighbor_edges.append(edge)
                 for node in nodes:
-                    if node["id"] == edge.get("source") or node["id"] == edge.get("target"):
+                    if node["id"] == edge.get("source") or node["id"] == edge.get(
+                        "target"
+                    ):
                         if node not in top_nodes:
                             top_nodes.append(node)
 
@@ -240,7 +270,9 @@ class GraphifyBridge:
         for comm, comm_nodes in sorted(communities.items()):
             lines.append(f"📁 {comm}/")
             for node in comm_nodes[:5]:
-                lines.append(f"  • {node.get('label', node['id'])} ({node.get('type', 'file')})")
+                lines.append(
+                    f"  • {node.get('label', node['id'])} ({node.get('type', 'file')})"
+                )
             if len(comm_nodes) > 5:
                 lines.append(f"  ... и ещё {len(comm_nodes)-5}")
             lines.append("")
@@ -248,7 +280,9 @@ class GraphifyBridge:
         if neighbor_edges:
             lines.append("=== КЛЮЧЕВЫЕ СВЯЗИ ===")
             for edge in neighbor_edges[:10]:
-                lines.append(f"  {edge.get('source', '?')} --[{edge.get('relation', '?')}]--> {edge.get('target', '?')}")
+                lines.append(
+                    f"  {edge.get('source', '?')} --[{edge.get('relation', '?')}]--> {edge.get('target', '?')}"
+                )
 
         if self._report:
             lines.append("")
@@ -258,7 +292,7 @@ class GraphifyBridge:
 
         return "\n".join(lines)
 
-    def find_skill(self, skill_name: str) -> Optional[Dict]:
+    def find_skill(self, skill_name: str) -> dict | None:
         if self._graph is None:
             self._load()
         for node in self._graph.get("nodes", []):
@@ -266,7 +300,7 @@ class GraphifyBridge:
                 return node
         return None
 
-    def get_file_neighbors(self, file_path: str) -> List[str]:
+    def get_file_neighbors(self, file_path: str) -> list[str]:
         if self._graph is None:
             self._load()
         neighbors = []
@@ -277,19 +311,25 @@ class GraphifyBridge:
                 neighbors.append(f"{edge.get('source')} -> {edge.get('relation')}")
         return neighbors
 
+
 _bridge = GraphifyBridge()
+
 
 def build_graph(force: bool = False):
     _bridge.build(force=force)
 
+
 def get_context(query: str, max_nodes: int = 15) -> str:
     return _bridge.get_context(query, max_nodes)
 
-def find_skill(skill_name: str) -> Optional[Dict]:
+
+def find_skill(skill_name: str) -> dict | None:
     return _bridge.find_skill(skill_name)
 
-def get_file_neighbors(file_path: str) -> List[str]:
+
+def get_file_neighbors(file_path: str) -> list[str]:
     return _bridge.get_file_neighbors(file_path)
+
 
 if __name__ == "__main__":
     build_graph(force=True)

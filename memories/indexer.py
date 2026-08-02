@@ -1,18 +1,18 @@
+import pdfplumber
 import pytesseract
 from PIL import Image
-import pdfplumber
 
 # Укажи путь к Tesseract (если установлен)
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-import os
-import json
 from pathlib import Path
+
 import chromadb
 from chromadb.utils import embedding_functions
 
 PROJECT_ROOT = Path(__file__).parent.parent
 CHROMA_PATH = PROJECT_ROOT / "Storage" / "chroma"
+
 
 class MemoryIndexer:
     def index_file(self, path: str) -> bool:
@@ -22,17 +22,33 @@ class MemoryIndexer:
         content = ""
 
         try:
-            if ext in [".md", ".txt", ".py", ".json", ".yaml", ".yml", ".html", ".css", ".js", ".csv", ".xml", ".log"]:
-                content = path.read_text(encoding='utf-8', errors='ignore')
+            if ext in [
+                ".md",
+                ".txt",
+                ".py",
+                ".json",
+                ".yaml",
+                ".yml",
+                ".html",
+                ".css",
+                ".js",
+                ".csv",
+                ".xml",
+                ".log",
+            ]:
+                content = path.read_text(encoding="utf-8", errors="ignore")
 
             elif ext == ".docx":
                 import docx
+
                 doc = docx.Document(path)
                 content = "\n".join([p.text for p in doc.paragraphs])
 
             elif ext == ".pdf":
                 with pdfplumber.open(path) as pdf:
-                    content = "\n".join([page.extract_text() or "" for page in pdf.pages])
+                    content = "\n".join(
+                        [page.extract_text() or "" for page in pdf.pages]
+                    )
 
             elif ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
                 image = Image.open(path)
@@ -54,14 +70,34 @@ class MemoryIndexer:
     def index_all_files(self, root_path: str = "."):
         """Индексирует все поддерживаемые файлы."""
         root = Path(root_path)
-        extensions = [".md", ".txt", ".py", ".json", ".yaml", ".yml", ".html", ".css", ".js", ".csv", ".xml", ".log", ".docx", ".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
+        extensions = [
+            ".md",
+            ".txt",
+            ".py",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".html",
+            ".css",
+            ".js",
+            ".csv",
+            ".xml",
+            ".log",
+            ".docx",
+            ".pdf",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".bmp",
+            ".tiff",
+        ]
         count = 0
         for ext in extensions:
             for file in root.rglob(f"*{ext}"):
                 if self.index_file(str(file)):
                     count += 1
         return count
-        
+
     def __init__(self):
         self.client = chromadb.PersistentClient(path=str(CHROMA_PATH))
         self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -71,16 +107,13 @@ class MemoryIndexer:
 
     def _init_collections(self):
         self.sessions = self.client.get_or_create_collection(
-            name="sessions",
-            embedding_function=self.embedding_fn
+            name="sessions", embedding_function=self.embedding_fn
         )
         self.decisions = self.client.get_or_create_collection(
-            name="decisions",
-            embedding_function=self.embedding_fn
+            name="decisions", embedding_function=self.embedding_fn
         )
         self.notes = self.client.get_or_create_collection(
-            name="notes",
-            embedding_function=self.embedding_fn
+            name="notes", embedding_function=self.embedding_fn
         )
 
     def add_session(self, session_id: str, messages: list):
@@ -88,7 +121,7 @@ class MemoryIndexer:
         self.sessions.add(
             ids=[session_id],
             documents=[text],
-            metadatas=[{"type": "session", "count": len(messages)}]
+            metadatas=[{"type": "session", "count": len(messages)}],
         )
 
     def add_note(self, path: str, content: str):
@@ -96,7 +129,7 @@ class MemoryIndexer:
         self.notes.add(
             ids=[note_id],
             documents=[content],
-            metadatas=[{"path": path, "type": "note"}]
+            metadatas=[{"path": path, "type": "note"}],
         )
 
     def add_decision(self, context: str, decision: str, reason: str):
@@ -104,7 +137,7 @@ class MemoryIndexer:
         self.decisions.add(
             ids=[f"dec_{len(self.decisions.get()['ids'])}"],
             documents=[text],
-            metadatas=[{"type": "decision"}]
+            metadatas=[{"type": "decision"}],
         )
 
     def search(self, query: str, collection: str = "notes", n: int = 3) -> list:
@@ -124,6 +157,7 @@ class MemoryIndexer:
             except:
                 pass
         return "\n\n---\n\n".join(results) if results else "Nothing found."
+
 
 if __name__ == "__main__":
     indexer = MemoryIndexer()

@@ -3,13 +3,12 @@ Self-Upgrade — sistema samosovershenstvovaniya Atlas.
 Chitaet svoy kod, analiziruet cherez LLM, delaet backup, sohranyaet predlozheniya.
 """
 
-import os
-import sys
 import json
+import os
 import shutil
-import time
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "Config"))
 from llm_client import ask_llm
@@ -36,10 +35,7 @@ def scan_files():
             rel_path = fpath.relative_to(BASE_DIR)
             try:
                 content = fpath.read_text(encoding="utf-8")
-                files.append({
-                    "path": str(rel_path),
-                    "content": content
-                })
+                files.append({"path": str(rel_path), "content": content})
             except Exception:
                 pass
     return files
@@ -50,16 +46,21 @@ def make_backup():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     backup_path = BACKUP_DIR / timestamp
     backup_path.mkdir(parents=True, exist_ok=True)
-    
+
     for item in BASE_DIR.iterdir():
         if item.name in EXCLUDE_DIRS:
             continue
         dest = backup_path / item.name
         if item.is_dir():
-            shutil.copytree(item, dest, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"), dirs_exist_ok=True)
+            shutil.copytree(
+                item,
+                dest,
+                ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
+                dirs_exist_ok=True,
+            )
         else:
             shutil.copy2(item, dest)
-    
+
     print(f"Backup sozdan: {backup_path}")
     return str(backup_path)
 
@@ -70,9 +71,9 @@ def analyze_system(files):
     for f in files:
         lines = f["content"].count("\n")
         summary.append(f"- {f['path']} ({lines} strok)")
-    
+
     summary_text = "\n".join(summary)
-    
+
     prompt = f"""Ty — arkhitektor programmnoy sistemy Atlas.
 Proanaliziruy etu sistemu i predlozhi KONKRETNYE uluchsheniya.
 
@@ -94,7 +95,7 @@ Trebuyu otvet STROGO v formate JSON:
 }}
 
 Ne pishi kod. Tolko analiz i predlozheniya."""
-    
+
     messages = [{"role": "user", "content": prompt}]
     print("Analiz sistemy...")
     answer = ask_llm(messages)
@@ -104,24 +105,22 @@ Ne pishi kod. Tolko analiz i predlozheniya."""
 def save_suggestion(raw_answer, backup_path):
     """Sokhranyaet predlozhenie v Memory."""
     SUGGESTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    
+
     suggestions = []
     if SUGGESTIONS_FILE.exists():
         suggestions = json.loads(SUGGESTIONS_FILE.read_text(encoding="utf-8"))
-    
+
     entry = {
         "timestamp": datetime.now().isoformat(),
         "backup": backup_path,
-        "raw_answer": raw_answer
+        "raw_answer": raw_answer,
     }
-    
+
     # Pitaemsya izvlech JSON iz otveta
     try:
         cleaned = raw_answer.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
+        cleaned = cleaned.removeprefix("```json")
+        cleaned = cleaned.removesuffix("```")
         cleaned = cleaned.strip()
         parsed = json.loads(cleaned)
         entry["parsed"] = parsed
@@ -131,9 +130,11 @@ def save_suggestion(raw_answer, backup_path):
     except json.JSONDecodeError:
         print("Model vernula ne JSON. Syroy otvet sohranen.")
         entry["parsed"] = None
-    
+
     suggestions.append(entry)
-    SUGGESTIONS_FILE.write_text(json.dumps(suggestions, indent=2, ensure_ascii=False), encoding="utf-8")
+    SUGGESTIONS_FILE.write_text(
+        json.dumps(suggestions, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     print(f"Sokhraneno v: {SUGGESTIONS_FILE}")
 
 
@@ -141,24 +142,24 @@ def main():
     print("=" * 50)
     print("ATLAS SELF-UPGRADE")
     print("=" * 50)
-    
+
     # Shag 1: Backup
     print("\nShag 1: Sozdanie backup...")
     backup = make_backup()
-    
+
     # Shag 2: Scan
     print("\nShag 2: Skanirovanie faylov...")
     files = scan_files()
     print(f"Naydeno faylov: {len(files)}")
-    
+
     # Shag 3: Analiz
     print("\nShag 3: Analiz cherez LLM...")
     answer = analyze_system(files)
-    
+
     # Shag 4: Save
     print("\nShag 4: Sokhranenie predlozheniy...")
     save_suggestion(answer, backup)
-    
+
     print("\n" + "=" * 50)
     print("GOTOV!")
     print("=" * 50)

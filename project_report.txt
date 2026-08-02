@@ -1,0 +1,45 @@
+==================================================
+PROJECT SCAN REPORT — Atlas
+==================================================
+Сканировано: 379 файлов
+Общий размер: 60154 KB
+Общее количество строк: 428456
+
+📊 Языки:
+  Image: 147 файлов
+  Python: 55 файлов
+  Markdown: 55 файлов
+  JSON: 50 файлов
+  Other: 31 файлов
+  JavaScript: 14 файлов
+  Text: 8 файлов
+  YAML: 6 файлов
+  Word: 6 файлов
+  HTML: 5 файлов
+  Batch: 1 файлов
+  CSS: 1 файлов
+
+📁 Папки:
+  • .
+  • Agents
+  • Agents\architect
+  • Agents\ceo
+  • Agents\planner
+  • Agents\reviewer
+  • Brain
+  • Config
+  • Docs
+  • Docs\Deepseek-helper
+  • Docs\adr
+  • Docs\rfcs
+  • Docs\templates
+  • Memory
+  • Projects\nails_site
+  • Projects\pixelcraft
+  • Projects\pixelcraft\assets
+  • Projects\pixelcraft\assets\img
+  • Projects\pixelcraft\assets\img\about
+  • Projects\pixelcraft\assets\img\logos
+  ... и ещё 68 папок
+
+==================================================

@@ -1,10 +1,10 @@
 ﻿agents:
-  executive: [openrouter, groq, cloudflare]
-  brief: [openrouter, groq, cloudflare]
-  developer: [openrouter, groq, ollama]
-  self_upgrade: [openrouter, groq, ollama]
-  branding: [openrouter, groq, ollama]
-  media: [openrouter, groq, ollama]
+  executive: [groq, gemini, ollama]
+  brief: [groq, gemini, ollama]
+  developer: [groq, cloudflare, openrouter, ollama]
+  self_upgrade: [groq, gemini, ollama]
+  branding: [groq, gemini, ollama]
+  media: [groq, cloudflare, openrouter, ollama]
 
 ollama_models:
   executive: qwen2.5-coder:3b
@@ -15,12 +15,15 @@ ollama_models:
   media: qwen2.5-coder:3b
 
 providers:
-  openrouter:
-    model: google/gemini-2.5-pro-exp-03-25:free
-    timeout: 30
   groq:
     model: llama-3.3-70b-versatile
     timeout: 15
+  gemini:
+    model: gemini-2.5-flash
+    timeout: 30
+  openrouter:
+    model: google/gemini-2.5-flash:free
+    timeout: 30
   cloudflare:
     model: "@cf/meta/llama-3.1-8b-instruct"
     timeout: 20

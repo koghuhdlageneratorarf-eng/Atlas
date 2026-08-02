@@ -43,7 +43,7 @@ PRAVILA:
 - Ne pishi kod, tolko tekst
 
 Rezultat:"""
-    
+
     messages = [{"role": "user", "content": prompt}]
     return ask_llm(messages, agent="brief")
 
@@ -64,7 +64,7 @@ def run_brief(task: str, project_dir: str):
         print(f"Brief Agent: sostavlyayu TZ dlya '{task[:50]}...'")
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Zapros: {task}"}
+            {"role": "user", "content": f"Zapros: {task}"},
         ]
         tz = ask_llm(messages, agent="brief")
 

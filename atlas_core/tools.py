@@ -2,16 +2,16 @@
 Atlas_Core/tools.py — Tool Execution Layer
 Выполнение инструментов: файлы, git, команды, поиск.
 """
+
 import os
-import re
-import json
-import time
 import shutil
 import subprocess
+import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).parent.parent
+
 
 def _safe_path(path_str: str) -> Path:
     """Преобразовать путь в безопасный относительный путь внутри проекта."""
@@ -24,6 +24,7 @@ def _safe_path(path_str: str) -> Path:
     else:
         p = PROJECT_ROOT / p
     return p
+
 
 WHITELISTED_PATHS = [
     PROJECT_ROOT / "Skills",
@@ -44,17 +45,20 @@ PROTECTED_PATHS = [
     PROJECT_ROOT / "Storage" / "memory_events.db",
 ]
 
+
 def _is_protected(path: Path) -> bool:
     for protected in PROTECTED_PATHS:
         if path.resolve() == protected.resolve():
             return True
     return False
 
-def _get_path_arg(args: Dict[str, Any]) -> str:
+
+def _get_path_arg(args: dict[str, Any]) -> str:
     """Fallback: LLM может использовать path, file_path или file."""
     return args.get("path") or args.get("file_path") or args.get("file", "")
 
-def tool_list_directory(args: Dict[str, Any]) -> str:
+
+def tool_list_directory(args: dict[str, Any]) -> str:
     path = _safe_path(args.get("path", "."))
     if not path.exists():
         return f"❌ Path not found: {path}"
@@ -64,7 +68,8 @@ def tool_list_directory(args: Dict[str, Any]) -> str:
         lines.append(f"{icon} {item.name}")
     return "\n".join(lines) if lines else "(empty)"
 
-def tool_read_file(args: Dict[str, Any]) -> str:
+
+def tool_read_file(args: dict[str, Any]) -> str:
     path = _safe_path(_get_path_arg(args))
     print(f"[WRITE DEBUG] path={path}")
     if not path.exists():
@@ -75,12 +80,16 @@ def tool_read_file(args: Dict[str, Any]) -> str:
         limit = args.get("limit", 200)
         if limit and len(content.splitlines()) > limit:
             lines = content.splitlines()[:limit]
-            return "\n".join(lines) + f"\n\n... ({len(content.splitlines()) - limit} more lines)"
+            return (
+                "\n".join(lines)
+                + f"\n\n... ({len(content.splitlines()) - limit} more lines)"
+            )
         return content
     except Exception as e:
         return f"❌ Error reading {path}: {e}"
 
-def tool_write_file(args: Dict[str, Any]) -> str:
+
+def tool_write_file(args: dict[str, Any]) -> str:
     path = _safe_path(_get_path_arg(args))
     if _is_protected(path):
         return f"🚫 Protected file: {path}. Use manual edit."
@@ -90,7 +99,8 @@ def tool_write_file(args: Dict[str, Any]) -> str:
         f.write(content)
     return f"✅ Written {path} ({len(content)} chars)"
 
-def tool_edit_file(args: Dict[str, Any]) -> str:
+
+def tool_edit_file(args: dict[str, Any]) -> str:
     path = _safe_path(_get_path_arg(args))
     if _is_protected(path):
         return f"🚫 Protected file: {path}. Use manual edit."
@@ -107,7 +117,8 @@ def tool_edit_file(args: Dict[str, Any]) -> str:
         f.write(content)
     return f"✅ Edited {path}"
 
-def tool_run_command(args: Dict[str, Any]) -> str:
+
+def tool_run_command(args: dict[str, Any]) -> str:
     cmd = args.get("command", "")
     cwd = args.get("cwd", str(PROJECT_ROOT))
     timeout = args.get("timeout", 30)
@@ -125,7 +136,8 @@ def tool_run_command(args: Dict[str, Any]) -> str:
     except Exception as e:
         return f"❌ Error: {e}"
 
-def tool_search_files(args: Dict[str, Any]) -> str:
+
+def tool_search_files(args: dict[str, Any]) -> str:
     query = args.get("query", "")
     path = _safe_path(args.get("path", "."))
     results = []
@@ -138,22 +150,31 @@ def tool_search_files(args: Dict[str, Any]) -> str:
                 with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
                 if query in content:
-                    lines = [i+1 for i, line in enumerate(content.splitlines()) if query in line]
+                    lines = [
+                        i + 1
+                        for i, line in enumerate(content.splitlines())
+                        if query in line
+                    ]
                     results.append(f"{fpath.relative_to(PROJECT_ROOT)}: lines {lines}")
             except Exception:
                 pass
     return "\n".join(results[:20]) if results else "(no matches)"
 
-def tool_git_status(args: Dict[str, Any]) -> str:
+
+def tool_git_status(args: dict[str, Any]) -> str:
     return tool_run_command({"command": "git status --short", "cwd": str(PROJECT_ROOT)})
 
-def tool_git_commit(args: Dict[str, Any]) -> str:
+
+def tool_git_commit(args: dict[str, Any]) -> str:
     msg = args.get("message", "Atlas update")
     r1 = tool_run_command({"command": "git add -A", "cwd": str(PROJECT_ROOT)})
-    r2 = tool_run_command({"command": f'git commit -m "{msg}"', "cwd": str(PROJECT_ROOT)})
+    r2 = tool_run_command(
+        {"command": f'git commit -m "{msg}"', "cwd": str(PROJECT_ROOT)}
+    )
     return f"{r1}\n{r2}"
 
-def tool_backup_file(args: Dict[str, Any]) -> str:
+
+def tool_backup_file(args: dict[str, Any]) -> str:
     path = _safe_path(_get_path_arg(args))
     if not path.exists():
         return f"❌ File not found: {path}"
@@ -164,8 +185,9 @@ def tool_backup_file(args: Dict[str, Any]) -> str:
     shutil.copy2(path, backup_path)
     return f"💾 Backup: {backup_path}"
 
+
 def tool_rollback(args: Dict[str, Any]) -> str:
-    """Откат к последнему бэкапу."""
+    """Откат к последнему бэкапу (исключая .git)."""
     backup_dir = PROJECT_ROOT / "Storage" / "backups"
     if not backup_dir.exists():
         return "❌ Нет бэкапов"
@@ -175,9 +197,13 @@ def tool_rollback(args: Dict[str, Any]) -> str:
     latest = backups[0]
     import tarfile
     with tarfile.open(latest, "r:gz") as tar:
-        tar.extractall(path=PROJECT_ROOT)
-    return f"✅ Откат к {latest.name}"
-    
+        for member in tar.getmembers():
+            if ".git" in member.name or "/.git/" in member.name or member.name.startswith(".git"):
+                continue
+            tar.extract(member, path=PROJECT_ROOT, set_attrs=False)
+    return f"✅ Откат к {latest.name} (исключая .git)"
+
+
 TOOL_REGISTRY = {
     "list_directory": tool_list_directory,
     "read_file": tool_read_file,
@@ -189,10 +215,11 @@ TOOL_REGISTRY = {
     "git_status": tool_git_status,
     "git_commit": tool_git_commit,
     "backup_file": tool_backup_file,
-    "rollback": tool_rollback, 
+    "rollback": tool_rollback,
 }
 
-def execute_tool(name: str, args: Dict[str, Any]) -> str:
+
+def execute_tool(name: str, args: dict[str, Any]) -> str:
     if name not in TOOL_REGISTRY:
         return f"❌ Unknown tool: {name}. Available: {list(TOOL_REGISTRY.keys())}"
     try:
@@ -200,13 +227,15 @@ def execute_tool(name: str, args: Dict[str, Any]) -> str:
     except Exception as e:
         return f"❌ Tool error ({name}): {e}"
 
-def create_backup(name: Optional[str] = None) -> str:
+
+def create_backup(name: str | None = None) -> str:
     backup_dir = PROJECT_ROOT / "Storage" / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
     ts = int(time.time())
     label = name or f"auto_{ts}"
     backup_path = backup_dir / label
     import tarfile
+
     archive = backup_path.with_suffix(".tar.gz")
     with tarfile.open(archive, "w:gz") as tar:
         for item in PROJECT_ROOT.iterdir():
@@ -215,19 +244,7 @@ def create_backup(name: Optional[str] = None) -> str:
             tar.add(item, arcname=item.name)
     return f"💾 Full backup: {archive}"
 
-def run_command(cmd: str, cwd: Optional[str] = None) -> str:
+
+def run_command(cmd: str, cwd: str | None = None) -> str:
     return tool_run_command({"command": cmd, "cwd": cwd or str(PROJECT_ROOT)})
 
-def tool_rollback(args: Dict[str, Any]) -> str:
-    """Откат к последнему бэкапу."""
-    backup_dir = PROJECT_ROOT / "Storage" / "backups"
-    if not backup_dir.exists():
-        return "❌ Нет бэкапов"
-    backups = sorted(backup_dir.glob("*.tar.gz"), key=os.path.getmtime, reverse=True)
-    if not backups:
-        return "❌ Нет бэкапов"
-    latest = backups[0]
-    import tarfile
-    with tarfile.open(latest, "r:gz") as tar:
-        tar.extractall(path=PROJECT_ROOT)
-    return f"✅ Откат к {latest.name}"

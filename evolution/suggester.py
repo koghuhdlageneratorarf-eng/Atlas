@@ -1,13 +1,13 @@
 """
 Evolution Engine v2.0 — Atlas сам генерирует и применяет улучшения.
 """
-import os
+
 import json
-import subprocess
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
+
 
 class Suggester:
     def __init__(self):
@@ -16,12 +16,16 @@ class Suggester:
 
     def _load(self):
         if self.suggestions_file.exists():
-            self.suggestions = json.loads(self.suggestions_file.read_text(encoding='utf-8'))
+            self.suggestions = json.loads(
+                self.suggestions_file.read_text(encoding="utf-8")
+            )
         else:
             self.suggestions = []
 
     def save(self):
-        self.suggestions_file.write_text(json.dumps(self.suggestions, indent=2, ensure_ascii=False), encoding='utf-8')
+        self.suggestions_file.write_text(
+            json.dumps(self.suggestions, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
     def analyze(self, context: str = ""):
         """Анализирует проект и предлагает улучшения через LLM."""
@@ -65,6 +69,7 @@ class Suggester:
 
         try:
             import re
+
             clean = re.sub(r"```json\s*", "", response)
             clean = re.sub(r"```\s*", "", clean)
             data = json.loads(clean)
@@ -112,7 +117,9 @@ class Suggester:
         for attempt in range(max_retries + 1):
             if attempt > 0:
                 print(f"[Evolution] Перегенерация {attempt}/{max_retries}...")
-                generated = self._generate_code(title, desc + f"\n\nОшибка: {last_error}")
+                generated = self._generate_code(
+                    title, desc + f"\n\nОшибка: {last_error}"
+                )
                 if not generated:
                     break
                 code = generated.get("code", "")
@@ -146,6 +153,7 @@ class Suggester:
 
         try:
             import re
+
             clean = re.sub(r"```json\s*", "", response)
             clean = re.sub(r"```\s*", "", clean)
             return json.loads(clean)
@@ -154,6 +162,7 @@ class Suggester:
 
     def _apply_code(self, code: str, files: list, title: str) -> str:
         import ast
+
         results = []
         for filepath in files:
             path = PROJECT_ROOT / filepath
@@ -162,7 +171,7 @@ class Suggester:
                 ast.parse(code)
             except SyntaxError as e:
                 return f"❌ Синтаксическая ошибка в {filepath}: {e}"
-            path.write_text(code, encoding='utf-8')
+            path.write_text(code, encoding="utf-8")
             results.append(f"✅ {path}")
         for s in self.suggestions:
             if s.get("title") == title:

@@ -9,7 +9,7 @@ Permission Engine — управление уровнями риска дейс�
 """
 
 from enum import Enum
-from typing import Dict, List, Optional
+
 
 class RiskLevel(Enum):
     SAFE = "safe"
@@ -17,10 +17,11 @@ class RiskLevel(Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
+
 class PermissionEngine:
     def __init__(self):
         # Правила: действие → уровень риска
-        self.rules: Dict[str, RiskLevel] = {
+        self.rules: dict[str, RiskLevel] = {
             # SAFE — автоматически
             "read_file": RiskLevel.SAFE,
             "list_directory": RiskLevel.SAFE,
@@ -30,7 +31,6 @@ class PermissionEngine:
             "get_symbols": RiskLevel.SAFE,
             "analyze": RiskLevel.SAFE,
             "plan": RiskLevel.SAFE,
-            
             # MEDIUM — требуется подтверждение
             "write_file": RiskLevel.MEDIUM,
             "edit_file": RiskLevel.MEDIUM,
@@ -39,13 +39,11 @@ class PermissionEngine:
             "backup_file": RiskLevel.MEDIUM,
             "rollback": RiskLevel.MEDIUM,
             "run_command": RiskLevel.MEDIUM,
-            
             # HIGH — только после ручного разрешения
             "delete_file": RiskLevel.HIGH,
             "git_push": RiskLevel.HIGH,
             "install_package": RiskLevel.HIGH,
             "modify_config": RiskLevel.HIGH,
-            
             # CRITICAL — запрещено
             "delete_project": RiskLevel.CRITICAL,
             "clear_memory": RiskLevel.CRITICAL,
@@ -54,14 +52,14 @@ class PermissionEngine:
             "modify_constitution": RiskLevel.CRITICAL,
             "dangerous_shell": RiskLevel.CRITICAL,
         }
-        
+
         # Одобренные HIGH операции (временные)
-        self.approved: List[str] = []
-    
+        self.approved: list[str] = []
+
     def get_risk(self, action: str) -> RiskLevel:
         """Получить уровень риска для действия."""
         return self.rules.get(action, RiskLevel.MEDIUM)
-    
+
     def can_execute(self, action: str) -> tuple:
         """
         Проверить, можно ли выполнить действие.
@@ -77,17 +75,17 @@ class PermissionEngine:
         if risk == RiskLevel.CRITICAL:
             return False, "critical_operation"
         return False, "unknown"
-    
+
     def approve(self, action: str) -> None:
         """Одобрить HIGH операцию (временное разрешение)."""
         if action not in self.approved:
             self.approved.append(action)
-    
+
     def revoke(self, action: str) -> None:
         """Отозвать разрешение."""
         if action in self.approved:
             self.approved.remove(action)
-    
+
     def require_confirmation(self, action: str) -> str:
         """Вернуть сообщение для подтверждения."""
         risk = self.get_risk(action)
@@ -96,7 +94,7 @@ class PermissionEngine:
         if risk == RiskLevel.HIGH:
             return f"🔴 Требуется одобрение: {action} (high risk)"
         return f"❌ Запрещено: {action}"
-    
+
     def status(self) -> str:
         return f"""
 Permission Engine
@@ -108,8 +106,10 @@ CRITICAL: {[a for a, r in self.rules.items() if r == RiskLevel.CRITICAL]}
 Approved HIGH: {self.approved or 'none'}
 """
 
+
 # Singleton
 _permission_engine = None
+
 
 def get_permission_engine() -> PermissionEngine:
     global _permission_engine
@@ -121,7 +121,7 @@ def get_permission_engine() -> PermissionEngine:
 if __name__ == "__main__":
     pe = get_permission_engine()
     print(pe.status())
-    
+
     print("\n--- Тест ---")
     for action in ["read_file", "write_file", "delete_file", "modify_permissions"]:
         allowed, reason = pe.can_execute(action)

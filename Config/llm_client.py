@@ -1,18 +1,22 @@
 ﻿"""Atlas Brain Router — LLM client with Graphify context + multi-provider fallback."""
+
 import os
 import sys
-sys.stdout.reconfigure(encoding='utf-8')
+
+sys.stdout.reconfigure(encoding="utf-8")
 import json
 import time
+from pathlib import Path
+
 import requests
 import yaml
-from pathlib import Path
 from dotenv import load_dotenv
 
 # Graphify bridge
 sys.path.insert(0, str(Path(__file__).parent.parent / "Brain"))
 try:
     from graphify_bridge import get_context as graphify_context
+
     GRAPHIFY_AVAILABLE = True
 except ImportError:
     GRAPHIFY_AVAILABLE = False
@@ -23,7 +27,9 @@ print(f"[DEBUG] Looking for .env at: {env_path}")
 print(f"[DEBUG] .env exists: {env_path.exists()}")
 if env_path.exists():
     load_dotenv(env_path, override=True)
-    print(f"[DEBUG] OPENROUTER_KEY loaded: {'yes' if os.getenv('OPENROUTER_API_KEY') else 'no'}")
+    print(
+        f"[DEBUG] OPENROUTER_KEY loaded: {'yes' if os.getenv('OPENROUTER_API_KEY') else 'no'}"
+    )
     print(f"[DEBUG] GROQ_KEY loaded: {'yes' if os.getenv('GROQ_API_KEY') else 'no'}")
 
 # Config
@@ -48,48 +54,77 @@ HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "")
 # Provider endpoints
 PROVIDERS = {
     "gemini": {
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
         "key": GEMINI_KEY,
         "header": lambda k: {"x-goog-api-key": k},
-        "payload": lambda msg: {"contents": [{"role": m["role"], "parts": [{"text": m["content"]}]} for m in msg], "generationConfig": {"temperature": 0.3}},
-        "extract": lambda r: r["candidates"][0]["content"]["parts"][0]["text"]
+        "payload": lambda msg: {
+            "contents": [
+                {"role": m["role"], "parts": [{"text": m["content"]}]} for m in msg
+            ],
+            "generationConfig": {"temperature": 0.3},
+        },
+        "extract": lambda r: r["candidates"][0]["content"]["parts"][0]["text"],
     },
-     "cerebras": {
+    "cerebras": {
         "url": "https://api.cerebras.ai/v1/chat/completions",
         "key": CEREBRAS_KEY,
         "header": lambda k: {"Authorization": f"Bearer {k}"},
-        "payload": lambda msg: {"model": "llama-3.1-8b", "messages": msg, "temperature": 0.3},
-        "extract": lambda r: r["choices"][0]["message"]["content"]
+        "payload": lambda msg: {
+            "model": "llama-3.1-8b",
+            "messages": msg,
+            "temperature": 0.3,
+        },
+        "extract": lambda r: r["choices"][0]["message"]["content"],
     },
     "groq": {
         "url": "https://api.groq.com/openai/v1/chat/completions",
         "key": GROQ_KEY,
         "header": lambda k: {"Authorization": f"Bearer {k}"},
-        "payload": lambda msg: {"model": "llama-3.3-70b-versatile", "messages": msg, "temperature": 0.3},
-        "extract": lambda r: r["choices"][0]["message"]["content"]
+        "payload": lambda msg: {
+            "model": "llama-3.3-70b-versatile",
+            "messages": msg,
+            "temperature": 0.3,
+        },
+        "extract": lambda r: r["choices"][0]["message"]["content"],
     },
     "openrouter": {
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "key": OPENROUTER_KEY,
-        "header": lambda k: {"Authorization": f"Bearer {k}", "HTTP-Referer": "https://atlas.local", "X-Title": "Atlas"},
-        "payload": lambda msg: {"model": "openrouter/auto", "messages": msg, "temperature": 0.3},
-        "extract": lambda r: r["choices"][0]["message"]["content"]
+        "header": lambda k: {
+            "Authorization": f"Bearer {k}",
+            "HTTP-Referer": "https://atlas.local",
+            "X-Title": "Atlas",
+        },
+        "payload": lambda msg: {
+            "model": "openrouter/auto",
+            "messages": msg,
+            "temperature": 0.3,
+        },
+        "extract": lambda r: r["choices"][0]["message"]["content"],
     },
     "cloudflare": {
         "url": f"https://api.cloudflare.com/client/v4/accounts/{os.getenv('CLOUDFLARE_ACCOUNT_ID','')}/ai/run/@cf/meta/llama-3.1-8b-instruct",
         "key": CLOUDFLARE_TOKEN,
         "header": lambda k: {"Authorization": f"Bearer {k}"},
         "payload": lambda msg: {"messages": msg},
-        "extract": lambda r: r["result"]["response"]
+        "extract": lambda r: r["result"]["response"],
     },
     "huggingface": {
         "url": "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct",
         "key": HF_TOKEN,
         "header": lambda k: {"Authorization": f"Bearer {k}"},
-        "payload": lambda msg: {"inputs": msg[-1]["content"], "parameters": {"max_new_tokens": 1024}},
-        "extract": lambda r: r[0]["generated_text"] if isinstance(r, list) else r.get("generated_text", "")
-    }
+        "payload": lambda msg: {
+            "inputs": msg[-1]["content"],
+            "parameters": {"max_new_tokens": 1024},
+        },
+        "extract": lambda r: (
+            r[0]["generated_text"]
+            if isinstance(r, list)
+            else r.get("generated_text", "")
+        ),
+    },
 }
+
 
 def _call_provider(name: str, messages: list, timeout: int = 60) -> str:
     """Call a specific provider."""
@@ -105,12 +140,15 @@ def _call_provider(name: str, messages: list, timeout: int = 60) -> str:
         url = f"{url}?key={cfg['key']}"
         headers = {"Content-Type": "application/json"}
 
-    response = requests.post(url, headers=headers, json=cfg["payload"](messages), timeout=timeout)
+    response = requests.post(
+        url, headers=headers, json=cfg["payload"](messages), timeout=timeout
+    )
     response.raise_for_status()
     result = cfg["extract"](response.json())
     if isinstance(result, dict):
         result = json.dumps(result, ensure_ascii=False)
     return result
+
 
 def _compress_messages(messages: list, max_chars: int = 6000) -> list:
     """Compress context for 3b models."""
@@ -120,6 +158,7 @@ def _compress_messages(messages: list, max_chars: int = 6000) -> list:
     system_msgs = [m for m in messages if m.get("role") == "system"]
     other_msgs = [m for m in messages if m.get("role") != "system"]
     return system_msgs + other_msgs[-3:]
+
 
 def _call_ollama(messages: list, model: str = DEFAULT_MODEL, timeout: int = 120) -> str:
     """Ollama with JSON format guarantee."""
@@ -131,12 +170,13 @@ def _call_ollama(messages: list, model: str = DEFAULT_MODEL, timeout: int = 120)
             "messages": compressed,
             "stream": False,
             "format": "json",
-            "options": {"temperature": 0.1, "num_predict": 2048}
+            "options": {"temperature": 0.1, "num_predict": 2048},
         },
-        timeout=timeout
+        timeout=timeout,
     )
     response.raise_for_status()
     return response.json()["message"]["content"]
+
 
 def _inject_graphify_context(messages: list, task: str = "") -> list:
     """
@@ -161,19 +201,21 @@ def _inject_graphify_context(messages: list, task: str = "") -> list:
 
     for i, m in enumerate(messages):
         if i == last_user_idx and last_user_idx >= 0:
-            new_messages.append({
-                "role": "user",
-                "content": m["content"] + "\n" + context_block
-            })
+            new_messages.append(
+                {"role": "user", "content": m["content"] + "\n" + context_block}
+            )
         else:
             new_messages.append(m)
 
     return new_messages
 
-def ask_llm(messages: list, agent: str = "developer", use_graph: bool = True, timeout: int = 120) -> str:
+
+def ask_llm(
+    messages: list, agent: str = "developer", use_graph: bool = True, timeout: int = 120
+) -> str:
     """
     Smart router with Graphify context injected into user message (not system).
-    
+
     Args:
         messages: list of messages
         agent: "executive", "brief", "developer", "self_upgrade"
@@ -211,6 +253,7 @@ def ask_llm(messages: list, agent: str = "developer", use_graph: bool = True, ti
 
     raise RuntimeError(f"All providers failed. Last error: {last_error}")
 
+
 def diagnose():
     """Check all providers."""
     print("=" * 50)
@@ -220,6 +263,7 @@ def diagnose():
     print(f"\n[Graphify] Available: {GRAPHIFY_AVAILABLE}")
     if GRAPHIFY_AVAILABLE:
         from graphify_bridge import build_graph
+
         build_graph()
         ctx = graphify_context("skills web", max_nodes=5)
         print(f"Context sample:\n{ctx[:500]}...")
@@ -245,7 +289,10 @@ def diagnose():
         print(f"  Error: {e}")
 
     # Test each provider
-    test_msg = [{"role": "system", "content": "You are Atlas."}, {"role": "user", "content": "Say 'OK' only"}]
+    test_msg = [
+        {"role": "system", "content": "You are Atlas."},
+        {"role": "user", "content": "Say 'OK' only"},
+    ]
     print("\n[PROVIDER TESTS]")
     for name in PROVIDERS:
         if PROVIDERS[name]["key"]:
@@ -257,8 +304,10 @@ def diagnose():
             except Exception as e:
                 print(f"  FAIL {name.upper()}: {e}")
 
+
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--diagnose", action="store_true")
     parser.add_argument("--test", choices=list(PROVIDERS.keys()) + ["ollama"])
@@ -269,7 +318,7 @@ if __name__ == "__main__":
     elif args.test:
         msg = [
             {"role": "system", "content": "You are Atlas coding agent."},
-            {"role": "user", "content": "Say 'OK' only"}
+            {"role": "user", "content": "Say 'OK' only"},
         ]
         if args.test == "ollama":
             print(_call_ollama(msg))
@@ -277,7 +326,12 @@ if __name__ == "__main__":
             print(_call_provider(args.test, msg))
     else:
         result = ask_llm(
-            [{"role": "user", "content": "What skills are available for building websites?"}],
-            agent="executive"
+            [
+                {
+                    "role": "user",
+                    "content": "What skills are available for building websites?",
+                }
+            ],
+            agent="executive",
         )
         print(result)

@@ -1,6 +1,8 @@
-from memories.indexer import MemoryIndexer
 from pathlib import Path
+
 import docx
+
+from memories.indexer import MemoryIndexer
 
 idx = MemoryIndexer()
 count = 0

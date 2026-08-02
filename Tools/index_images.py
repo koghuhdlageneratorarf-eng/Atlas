@@ -1,7 +1,9 @@
-from memories.indexer import MemoryIndexer
 from pathlib import Path
-from PIL import Image
+
 import pytesseract
+from PIL import Image
+
+from memories.indexer import MemoryIndexer
 
 # Укажи путь к Tesseract (если установлен)
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"

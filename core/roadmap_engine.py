@@ -1,9 +1,10 @@
-﻿import yaml
-from pathlib import Path
-from datetime import datetime
+﻿from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).parent.parent
 ROADMAP_FILE = ROOT / "roadmap.yaml"
+
 
 class RoadmapEngine:
     def __init__(self):
@@ -12,7 +13,7 @@ class RoadmapEngine:
 
     def _load(self):
         if ROADMAP_FILE.exists():
-            with open(ROADMAP_FILE, 'r', encoding='utf-8') as f:
+            with open(ROADMAP_FILE, "r", encoding="utf-8") as f:
                 return yaml.safe_load(f)
         return {"stages": []}
 
@@ -26,14 +27,18 @@ class RoadmapEngine:
             for task in stage.get("tasks", []):
                 if isinstance(task, str):
                     task = {"title": task, "status": "pending"}
-                self.tasks.append({
-                    "stage": stage_name,
-                    "stage_id": stage_id,
-                    "priority": priority,
-                    "id": task.get("id", task.get("title", "").lower().replace(" ", "_")),
-                    "title": task.get("title", task),
-                    "status": task.get("status", "pending")
-                })
+                self.tasks.append(
+                    {
+                        "stage": stage_name,
+                        "stage_id": stage_id,
+                        "priority": priority,
+                        "id": task.get(
+                            "id", task.get("title", "").lower().replace(" ", "_")
+                        ),
+                        "title": task.get("title", task),
+                        "status": task.get("status", "pending"),
+                    }
+                )
 
     def save(self):
         # Сохраняем обратно в YAML (пока не реализовано, чтобы не сломать структуру)
@@ -65,6 +70,7 @@ class RoadmapEngine:
                 continue
             result.append(f"[{t.get('stage')}] {t.get('title')} — {t.get('status')}")
         return "\n".join(result[:20]) + ("\n... и ещё" if len(result) > 20 else "")
+
 
 if __name__ == "__main__":
     engine = RoadmapEngine()

@@ -4,21 +4,37 @@ atlas_core/context.py — Менеджер контекста проекта
 Умное усечение: приоритет — skill.json, main.py, .py файлы агентов.
 """
 
-import os
 import json
 from pathlib import Path
-from typing import List, Dict, Optional, Set
+
 from core.symbol_resolver import SymbolResolver
 
 # Исключаем из контекста
-EXCLUDE_DIRS: Set[str] = {
-    "__pycache__", ".git", "node_modules", "dist", "build",
-    ".venv", "venv", ".pytest_cache", ".mypy_cache",
-    "Memory", "backups", "graphify-out"
+EXCLUDE_DIRS: set[str] = {
+    "__pycache__",
+    ".git",
+    "node_modules",
+    "dist",
+    "build",
+    ".venv",
+    "venv",
+    ".pytest_cache",
+    ".mypy_cache",
+    "Memory",
+    "backups",
+    "graphify-out",
 }
-EXCLUDE_FILES: Set[str] = {
-    ".env", ".gitignore", "package-lock.json", "yarn.lock",
-    "*.pyc", "*.pyo", "*.log", "*.db", "*.sqlite", "*.sqlite3"
+EXCLUDE_FILES: set[str] = {
+    ".env",
+    ".gitignore",
+    "package-lock.json",
+    "yarn.lock",
+    "*.pyc",
+    "*.pyo",
+    "*.log",
+    "*.db",
+    "*.sqlite",
+    "*.sqlite3",
 }
 
 # Приоритетные файлы (идут первыми, не обрезаются)
@@ -81,9 +97,9 @@ def _priority_score(path: Path) -> int:
 class ProjectContext:
     """Собирает и управляет контекстом проекта Atlas."""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         self.root = project_root or Path(__file__).parent.parent
-        self.file_cache: Dict[str, str] = {}
+        self.file_cache: dict[str, str] = {}
         self._build_cache()
 
     def _build_cache(self):
@@ -108,7 +124,7 @@ class ProjectContext:
             try:
                 entries = sorted(
                     [e for e in dir_path.iterdir() if _should_include(e, self.root)],
-                    key=lambda e: (e.is_file(), e.name.lower())
+                    key=lambda e: (e.is_file(), e.name.lower()),
                 )
             except PermissionError:
                 return
@@ -124,7 +140,7 @@ class ProjectContext:
         _tree(self.root)
         return "\n".join(lines)
 
-    def read_file(self, rel_path: str) -> Optional[str]:
+    def read_file(self, rel_path: str) -> str | None:
         """Прочитать файл по относительному пути."""
         rel_path = rel_path.replace("\\", "/")
         if rel_path in self.file_cache:
@@ -151,7 +167,7 @@ class ProjectContext:
         # 2. Приоритетные файлы
         sorted_files = sorted(
             self.file_cache.items(),
-            key=lambda item: (_priority_score(self.root / item[0]), item[0])
+            key=lambda item: (_priority_score(self.root / item[0]), item[0]),
         )
 
         # Оценка: ~4 символа = 1 токен
@@ -191,7 +207,7 @@ class ProjectContext:
 
         return "\n".join(parts)
 
-    def get_skills_catalog(self) -> List[Dict]:
+    def get_skills_catalog(self) -> list[dict]:
         """Прочитать все skill.json из Skills/."""
         skills = []
         skills_dir = self.root / "Skills"
@@ -205,13 +221,15 @@ class ProjectContext:
                     try:
                         with open(skill_json, "r", encoding="utf-8-sig") as f:
                             data = json.load(f)
-                        data["_path"] = str(skill_dir.relative_to(self.root)).replace("\\", "/")
+                        data["_path"] = str(skill_dir.relative_to(self.root)).replace(
+                            "\\", "/"
+                        )
                         skills.append(data)
                     except Exception:
                         pass
         return skills
 
-    def search_in_files(self, query: str) -> List[Dict]:
+    def search_in_files(self, query: str) -> list[dict]:
         """Поиск строки по файлам проекта."""
         results = []
         q = query.lower()
@@ -223,13 +241,16 @@ class ProjectContext:
                     if q in line.lower():
                         matches.append({"line": i, "text": line.strip()})
                 if matches:
-                    results.append({
-                        "file": rel_path,
-                        "matches": matches[:5]  # макс 5 совпадений на файл
-                    })
+                    results.append(
+                        {
+                            "file": rel_path,
+                            "matches": matches[:5],  # макс 5 совпадений на файл
+                        }
+                    )
         return results
+
     def get_symbols(self, filepath: str):
-        from core.symbol_resolver import SymbolResolver
+
         resolver = SymbolResolver()
         return resolver.get_symbols(filepath)
 

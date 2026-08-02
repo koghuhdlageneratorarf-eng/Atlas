@@ -1,0 +1,52 @@
+[
+  {
+    "file": "test_error.py",
+    "error_type": "NameError",
+    "message": "name 'print_goodbye' is not defined",
+    "attempts": 3,
+    "success": false
+  },
+  {
+    "file": "test_error.py",
+    "error_type": "NameError",
+    "message": "name 'print_goodbye' is not defined",
+    "attempts": 1,
+    "success": false
+  },
+  {
+    "file": "test_error.py",
+    "error_type": "NameError",
+    "message": "name 'print_goodbye' is not defined",
+    "attempts": 1,
+    "success": false
+  },
+  {
+    "file": "test_error.py",
+    "error_type": "NameError",
+    "message": "name 'print_goodbye' is not defined",
+    "attempts": 1,
+    "success": false
+  },
+  {
+    "file": "test_error.py",
+    "error_type": "NameError",
+    "message": "name 'print_goodbye' is not defined",
+    "attempts": 1,
+    "success": false
+  },
+  {
+    "file": "test_error.py",
+    "error_type": "NameError",
+    "message": "name 'print_goodbye' is not defined",
+    "attempts": 1,
+    "success": false
+  },
+  {
+    "file": "test_error.py",
+    "error_type": "NameError",
+    "message": "name 'print_goodbye' is not defined",
+    "diff": "--- test_error.py\n+++ test_error.py\n@@ -1,10 +1,10 @@\n def say_hello():\n     pass\n \n-def main():\n-    def print_goodbye():\n-        say_hello()\n-        print(\"Goodbye\")\n-    print(\"Hello\")\n-    print_goodbye()\n+def main():\n+    def print_goodbye():\n+        print(\"Goodbye\")\n+    print(\"Hello\")\n+    print_goodbye()\n",
+    "attempts": 1,
+    "success": true
+  }
+]
