@@ -14,7 +14,6 @@ class GitIntelligence:
         self.root = PROJECT_ROOT
 
     def has_changes(self) -> bool:
-        """Проверить, есть ли изменения в репозитории."""
         result = subprocess.run(
             ["git", "status", "--porcelain"],
             cwd=self.root,
@@ -24,14 +23,12 @@ class GitIntelligence:
         return bool(result.stdout.strip())
 
     def get_diff(self) -> str:
-        """Получить diff изменений."""
         result = subprocess.run(
             ["git", "diff", "--stat"], cwd=self.root, capture_output=True, text=True
         )
         return result.stdout
 
     def generate_commit_message(self, task_title: str, task_id: str = None) -> str:
-        """Сгенерировать сообщение для commit'а."""
         date = datetime.now().strftime("%Y-%m-%d %H:%M")
         msg = f"[Atlas] {task_title}\n\n"
         msg += f"Date: {date}\n"
@@ -43,20 +40,25 @@ class GitIntelligence:
         return msg
 
     def commit(self, task_title: str, task_id: str = None) -> dict:
-        """Выполнить commit, если есть изменения."""
         if not self.has_changes():
             return {"status": "no_changes", "message": "Нет изменений для commit'а"}
 
         msg = self.generate_commit_message(task_title, task_id)
 
         result = subprocess.run(
-            ["git", "add", "-A"], cwd=self.root, capture_output=True, text=True
+            ["git", "add", "-A"],
+            cwd=self.root,
+            capture_output=True,
+            text=True
         )
         if result.returncode != 0:
             return {"status": "error", "message": f"Git add failed: {result.stderr}"}
 
         result = subprocess.run(
-            ["git", "commit", "-m", msg], cwd=self.root, capture_output=True, text=True
+            ["git", "commit", "-m", msg],
+            cwd=self.root,
+            capture_output=True,
+            text=True
         )
         if result.returncode != 0:
             return {"status": "error", "message": f"Git commit failed: {result.stderr}"}

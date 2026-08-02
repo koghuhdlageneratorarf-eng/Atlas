@@ -1,6 +1,12 @@
-def say_goodbye():
-        # say_hello() - функция не определена, поэтому вызовем ее с проверкой
-        if 'say_hello' in globals():
-            say_hello()
-        else:
-            print("say_hello не определена")
+def say_hello():
+    print('Hello')
+
+def print_goodbye():
+    print('Goodbye')
+
+def main():
+    say_hello()
+    print_goodbye()
+
+if __name__ == '__main__':
+    main()

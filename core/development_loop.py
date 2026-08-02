@@ -119,7 +119,12 @@ class DevelopmentLoop:
             print(f"[Develop] ✅ Файл найден: {full_path}")
 
             # Читаем содержимое
-            original = full_path.read_text(encoding='utf-8')
+            try:
+                original = full_path.read_text(encoding='utf-8')
+            except UnicodeDecodeError:
+                print(f"[Develop] ⚠️ Файл {filepath} имеет бинарный формат, пропускаем")
+                self.steps.append(("Изменение", "⚠️"))
+                return False
 
             # Генерируем исправление через SelfDebugger
             error_info = {
@@ -130,8 +135,7 @@ class DevelopmentLoop:
             }
             diff = self.debugger.generate_fix(error_info)
             if diff:
-                result = self.patch_engine.apply_patch(filepath, diff, dry_run=False)
-                if result.get("success"):
+                if self.debugger.apply_fix(diff, filepath):
                     print(f"[Develop] ✅ Исправлен {filepath}")
                 else:
                     print(f"[Develop] ❌ Не удалось применить патч к {filepath}")
@@ -153,6 +157,7 @@ class DevelopmentLoop:
                 self.steps.append(("Проверка", "❌"))
                 return False
 
+            # Проверка синтаксиса
             result = subprocess.run(
                 [sys.executable, "-m", "py_compile", str(full_path)],
                 capture_output=True,
@@ -164,11 +169,13 @@ class DevelopmentLoop:
                 self.steps.append(("Проверка", "❌"))
                 return False
 
+            # Проверка импорта
             try:
                 import importlib.util
                 spec = importlib.util.spec_from_file_location("test_module", full_path)
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
+                if spec:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
             except Exception as e:
                 print(f"[Develop] Ошибка импорта: {e}")
                 self.steps.append(("Проверка", "❌"))
@@ -181,6 +188,22 @@ class DevelopmentLoop:
         all_ok = all(checks.values())
         self.steps.append(("Проверка", "✅" if all_ok else "❌"))
         return all_ok
+
+    def commit(self, task: str) -> bool:
+        print("[Develop] 💾 Commit...")
+        try:
+            result = self.git.commit(task)
+            if result.get("status") == "success":
+                self.steps.append(("Commit", "✅"))
+                return True
+            else:
+                print(f"[Develop] Commit error: {result.get('message')}")
+                self.steps.append(("Commit", "❌"))
+                return False
+        except Exception as e:
+            print(f"[Develop] Commit exception: {e}")
+            self.steps.append(("Commit", "❌"))
+            return False
 
     def debug(self, error: str = None) -> bool:
         print("[Develop] 🛠️ Исправление ошибок...")
@@ -206,13 +229,6 @@ class DevelopmentLoop:
         except:
             self.steps.append(("Тесты", "❌"))
             return False
-
-    def commit(self, task: str) -> bool:
-        print("[Develop] 💾 Commit...")
-        result = self.git.commit(task)
-        ok = result.get("status") == "success"
-        self.steps.append(("Commit", "✅" if ok else "❌"))
-        return ok
 
     def report(self) -> str:
         lines = ["\n" + "=" * 50, "📋 ОТЧЁТ ПО РАЗРАБОТКЕ", "=" * 50]

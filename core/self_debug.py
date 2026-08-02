@@ -30,6 +30,7 @@ class SelfDebugger:
         self.resolver = SymbolResolver()
         self.last_error = None
         self.fixes_applied = []
+        self._last_full_content = None
         self.history_file = PROJECT_ROOT / "Memory" / "fixes_history.json"
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -139,6 +140,7 @@ class SelfDebugger:
         return errors
 
     def generate_fix(self, error_info: Dict, previous_attempts: List[str] = None) -> Optional[str]:
+        self._last_full_content = None
         filepath = error_info.get("file")
         line = error_info.get("line")
         error_type = error_info.get("error_type")
@@ -147,6 +149,38 @@ class SelfDebugger:
         if not filepath:
             return None
 
+        # === AST FIX ===
+        try:
+            from core.ast_editor import ASTEditor
+            editor = ASTEditor(str(PROJECT_ROOT))
+            if editor.load(filepath):
+                if error_type == "NameError":
+                    import re
+                    match = re.search(r"name '(\w+)' is not defined", message)
+                    if match:
+                        func_name = match.group(1)
+                        if func_name not in editor.get_functions():
+                            # Добавляем функцию
+                            func_code = f"def {func_name}():\n    pass"
+                            if editor.add_function(func_code):
+                                if editor.save():
+                                    import difflib
+                                    content = Path(filepath).read_text(encoding='utf-8')
+                                    original = Path(filepath).read_text(encoding='utf-8')
+                                    diff = difflib.unified_diff(
+                                        original.splitlines(keepends=True),
+                                        content.splitlines(keepends=True),
+                                        fromfile=filepath,
+                                        tofile=filepath
+                                    )
+                                    diff_str = "".join(diff)
+                                    if diff_str.strip():
+                                        print(f"[SelfDebug] ✅ AST: добавлена функция {func_name}")
+                                        return diff_str
+        except Exception as e:
+            print(f"[SelfDebug] AST попытка: {e}")
+
+        # === LLM FALLBACK ===
         try:
             file_path = Path(filepath)
             if not file_path.is_absolute():
@@ -155,47 +189,39 @@ class SelfDebugger:
                 return None
             content = file_path.read_text(encoding='utf-8', errors='ignore')
         except Exception as e:
-            print(f"[SelfDebug] Ошибка чтения файла: {e}")
+            print(f"[SelfDebug] Ошибка чтения: {e}")
             return None
 
-        # Экранируем content для JSON
         import json as json_module
         content_escaped = json_module.dumps(content, ensure_ascii=False)
 
         prompt = f'''
-Ты — инженер Atlas. Найди и исправь ошибку в коде.
+Исправь ошибку в Python коде.
 
 Файл: {filepath}
-Строка: {line}
-Тип ошибки: {error_type}
-Сообщение: {message}
+Ошибка: {error_type} - {message}
 
-Весь код файла:
+Текущий код:
 {content_escaped}
 
-Проанализируй ошибку и предложи исправление в виде полного исправленного кода файла.
+Задача: исправить ошибку и вернуть ПОЛНЫЙ ИСПРАВЛЕННЫЙ КОД ФАЙЛА целиком.
 
-Ответ должен быть ТОЛЬКО в формате JSON:
-{{
-    "fixed_code": "полный исправленный код файла",
-    "explanation": "краткое объяснение"
-}}
+Правила:
+1. НЕ используй try/except без необходимости.
+2. Если функция не определена - добавь её.
+3. Сохрани все существующие функции.
+4. Используй 4 пробела для отступов.
+5. Убедись, что после def, if, for, try, except и т.д. есть правильный отступ (4 пробела).
+6. Код должен быть валидным Python.
 
-В исправленном коде:
-- Сохрани все отступы и структуру
-- Код должен быть валидным Python
-- Экранируй все кавычки внутри fixed_code
+Ответ ТОЛЬКО в формате JSON:
+{{"fixed_code": "ПОЛНЫЙ исправленный код файла", "explanation": "что исправлено"}}
 '''
-        if previous_attempts:
-            prompt += "\n\nПредыдущие попытки не сработали:\n" + "\n".join(previous_attempts)
-            prompt += "\nПопробуй другое исправление."
 
         messages = [{"role": "user", "content": prompt}]
 
         try:
             response = ask_llm(messages, agent="executive")
-
-            # Очистка от markdown
             clean = response.strip()
             if clean.startswith("```json"):
                 clean = clean[7:]
@@ -205,18 +231,35 @@ class SelfDebugger:
                 clean = clean[:-3]
             clean = clean.strip()
 
-            data = json_module.loads(clean)
+            print(f"[SelfDebug] RAW RESPONSE:\n{response[:500]}")
+            print(f"[SelfDebug] CLEANED:\n{clean[:500]}")
+            data = json_module.loads(clean, strict=False)
             fixed_code = data.get("fixed_code")
             explanation = data.get("explanation", "")
 
             if not fixed_code:
-                print("[SelfDebug] LLM не вернула fixed_code")
                 return None
 
-            if fixed_code.strip() == content.strip():
-                print("[SelfDebug] Код не изменился")
+            if len(fixed_code) < len(content) * 0.3:
+                print("[SelfDebug] Код слишком короткий")
                 return None
 
+            # Нормализуем отступы ДО проверки синтаксиса
+            fixed_code = self._normalize_code(fixed_code)
+            
+            try:
+                compile(fixed_code, filepath, 'exec')
+            except SyntaxError as e:
+                print(f"[SelfDebug] Синтаксическая ошибка: {e}")
+                return None
+
+            fixed_code = self._normalize_code(fixed_code)
+            content_normalized = self._normalize_code(content)
+
+            if fixed_code.strip() == content_normalized.strip():
+                return None
+
+            import difflib
             diff = difflib.unified_diff(
                 content.splitlines(keepends=True),
                 fixed_code.splitlines(keepends=True),
@@ -226,48 +269,168 @@ class SelfDebugger:
             diff_str = "".join(diff)
 
             if not diff_str.strip():
-                print("[SelfDebug] Diff пустой")
                 return None
 
-            print(f"[SelfDebug] Сгенерирован diff ({len(diff_str)} символов)")
+            print(f"[SelfDebug] ✅ LLM diff ({len(diff_str)} символов)")
             print(f"[SelfDebug] Объяснение: {explanation[:100]}...")
+            # Сохраняем полный текст файла — именно его запишем в apply_fix,
+            # не полагаясь на построчный patch_engine (источник рассинхронизации).
+            self._last_full_content = fixed_code
             return diff_str
 
-        except json_module.JSONDecodeError as e:
-            print(f"[SelfDebug] Ошибка парсинга JSON: {e}")
-            print(f"[SelfDebug] Ответ: {response[:200]}...")
+        except Exception as e:
+            print(f"[SelfDebug] LLM ошибка: {e}")
+            return None
+
+    def _normalize_code(self, code: str) -> str:
+        lines = code.splitlines()
+        # Удаляем пустые строки в начале и конце
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+
+        # Находим минимальный отступ у непустых строк
+        min_indent = None
+        for line in lines:
+            if line.strip():
+                indent = len(line) - len(line.lstrip())
+                if min_indent is None or indent < min_indent:
+                    min_indent = indent
+
+        if min_indent is None or min_indent == 0:
+            return "\n".join(lines)
+
+        # Убираем общий отступ
+        normalized = []
+        for line in lines:
+            if line.strip():
+                normalized.append(line[min_indent:])
+            else:
+                normalized.append(line)
+
+        return "\n".join(normalized)
+
+    def _generate_ast_fix(self, filepath: str, error_info: Dict) -> Optional[str]:
+        """Исправляет ошибку через AST-редактирование."""
+        try:
+            from core.ast_editor import ASTEditor
+            
+            editor = ASTEditor(str(PROJECT_ROOT))
+            if not editor.load(filepath):
+                return None
+            
+            error_type = error_info.get("error_type")
+            message = error_info.get("message")
+            
+            # Если NameError - добавляем недостающую функцию
+            if error_type == "NameError":
+                import re
+                match = re.search(r"name '(\w+)' is not defined", message)
+                if match:
+                    func_name = match.group(1)
+                    # Проверяем, есть ли уже такая функция
+                    if func_name in editor.get_functions():
+                        return None
+                    
+                    # Добавляем функцию
+                    func_code = f"def {func_name}():\n    print('{func_name} called')"
+                    if editor.add_function(func_code):
+                        if editor.save():
+                            # Читаем обновлённый файл и создаём diff
+                            content = Path(filepath).read_text(encoding='utf-8')
+                            # Создаём diff через патч-инжин
+                            diff = f"""--- {filepath}
++++ {filepath}
+@@ -1,1 +1,1 @@
+-{content.splitlines()[0] if content else ''}
++{content.splitlines()[0] if content else ''}"""
+                            # Простой diff через difflib
+                            import difflib
+                            original = Path(filepath).read_text(encoding='utf-8')
+                            diff = difflib.unified_diff(
+                                original.splitlines(keepends=True),
+                                content.splitlines(keepends=True),
+                                fromfile=filepath,
+                                tofile=filepath
+                            )
+                            return "".join(diff)
             return None
         except Exception as e:
-            print(f"[SelfDebug] Ошибка генерации: {e}")
+            print(f"[SelfDebug] AST fix error: {e}")
             return None
 
     def apply_fix(self, diff: str, filepath: str) -> bool:
-        # Проверяем, что файл существует
         file_path = Path(filepath)
         if not file_path.is_absolute():
             file_path = PROJECT_ROOT / file_path
         if not file_path.exists():
             return False
 
-        # Сохраняем оригинальное содержимое
         try:
             original = file_path.read_text(encoding='utf-8')
-        except:
+        except Exception:
             return False
 
-        # Применяем патч
-        result = self.patch_engine.apply_patch(filepath, diff, dry_run=False)
-        if not result.get("success"):
-            # Восстанавливаем оригинал
+        if self._last_full_content is not None:
+            # Полный текст файла уже был сгенерирован моделью — пишем его
+            # напрямую, не пропуская через patch_engine. Построчный патчер
+            # ненадёжен при дублирующихся строках контекста (например,
+            # несколько "def main():" в файле) и может потерять целые
+            # функции при применении диффа — именно это вызывало баг
+            # с пропаданием кода после "Код нормализован".
+            new_content = self._last_full_content
+            self._last_full_content = None  # используем один раз
+        else:
+            # Патч без готового полного текста (например, из AST-ветки) —
+            # применяем как раньше, через patch_engine.
+            result = self.patch_engine.apply_patch(filepath, diff, dry_run=False)
+            if not result.get("success"):
+                file_path.write_text(original, encoding='utf-8')
+                return False
+            try:
+                new_content = file_path.read_text(encoding='utf-8')
+            except Exception as e:
+                print(f"[SelfDebug] Ошибка чтения после патча: {e}")
+                file_path.write_text(original, encoding='utf-8')
+                return False
+
+        # Нормализуем код
+        normalized = self._normalize_code(new_content)
+        if normalized != new_content:
+            print("[SelfDebug] Код нормализован")
+            new_content = normalized
+
+        # Отладка: выводим первые 200 символов
+        print("[SelfDebug] Содержимое после нормализации:")
+        print(repr(new_content[:200]))
+
+        # Записываем
+        try:
+            file_path.write_text(new_content, encoding='utf-8')
+        except Exception as e:
+            print(f"[SelfDebug] Ошибка записи: {e}")
             file_path.write_text(original, encoding='utf-8')
             return False
 
-        # Проверяем, что файл стал валидным
+        # Проверяем синтаксис
         try:
             import py_compile
             py_compile.compile(file_path, doraise=True)
-        except Exception:
-            # Восстанавливаем оригинал
+        except Exception as e:
+            print(f"[SelfDebug] Синтаксическая ошибка: {e}")
+            file_path.write_text(original, encoding='utf-8')
+            return False
+
+        # Проверяем импорт
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("test_module", file_path)
+            if spec:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+        except Exception as e:
+            print(f"[SelfDebug] Ошибка импорта: {e}")
             file_path.write_text(original, encoding='utf-8')
             return False
 
