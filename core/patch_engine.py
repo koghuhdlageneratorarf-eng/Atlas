@@ -48,6 +48,18 @@ class PatchEngine:
                     "diff": diff,
                     "file": str(filepath),
                 }
+            
+            # === ДОБАВИТЬ ПРОВЕРКУ СИНТАКСИСА ===
+            try:
+                compile(new_content, str(filepath), 'exec')
+            except SyntaxError as e:
+                return {
+                    "success": False,
+                    "message": f"Синтаксическая ошибка после применения: {e}",
+                    "diff": diff,
+                    "file": str(filepath),
+                }
+            
             filepath.write_text(new_content, encoding="utf-8")
             return {
                 "success": True,
