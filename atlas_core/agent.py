@@ -17,9 +17,7 @@ _runtime = None
 _server_pid = None
 
 def get_atlas_runtime():
-    """{
-    "get_atlas_runtime": "Возвращает текущую версию Atlas Runtime, используемую в текущей сессии."
-}"""
+    """Возвращает текущую версию Atlas Runtime, используемую в текущей сессии."""
     global _runtime
     if _runtime is None:
         _runtime = get_runtime()
@@ -32,6 +30,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 def _load_env(filepath=None):
+    """Загружает переменные окружения для работы агента Atlas."""
     if filepath is None:
         filepath = PROJECT_ROOT / 'Config' / '.env'
     try:

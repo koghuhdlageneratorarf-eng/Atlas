@@ -140,16 +140,16 @@ class SelfDebugger:
                 errors.append({"line": line, "raw": log_lines})
         return errors
 
-    def _extract_docstring_text(self, raw: str) -> str:
+    def _extract_docstring_text(self, raw: str, func_name: str = None) -> str:
         """Достаёт чистый текст docstring из ответа модели.
 
         Некоторые модели (особенно локальные, вроде qwen2.5-coder через
         Ollama, если системный промпт проекта учит их отвечать в JSON)
-        оборачивают простой текст в JSON-структуру вида
-        {"name": "...", "description": "..."} вместо того, чтобы просто
-        вернуть текст docstring. Эта функция пытается достать полезный
-        текст из такой обёртки, а если это обычный текст — просто чистит
-        кавычки/markdown по краям.
+        оборачивают простой текст в JSON вместо того, чтобы просто вернуть
+        текст docstring — иногда с ключами вроде "description", а иногда
+        используя само имя функции как ключ: {"func_name": "текст"}.
+        Эта функция пытается достать полезный текст из любой такой обёртки,
+        а если это обычный текст — просто чистит кавычки/markdown по краям.
         """
         text = raw.strip()
 
@@ -162,9 +162,19 @@ class SelfDebugger:
         if text.startswith("{"):
             try:
                 data = json.loads(text)
-                for key in ("docstring", "description", "doc", "text"):
-                    if isinstance(data.get(key), str) and data[key].strip():
-                        return data[key].strip()
+                if isinstance(data, dict):
+                    # 1) Известные "стандартные" ключи
+                    for key in ("docstring", "description", "doc", "text"):
+                        if isinstance(data.get(key), str) and data[key].strip():
+                            return data[key].strip()
+                    # 2) Ключ — это имя самой функции
+                    if func_name and isinstance(data.get(func_name), str) and data[func_name].strip():
+                        return data[func_name].strip()
+                    # 3) Словарь с единственным строковым значением — берём его,
+                    #    независимо от того, как называется ключ
+                    string_values = [v.strip() for v in data.values() if isinstance(v, str) and v.strip()]
+                    if len(string_values) == 1:
+                        return string_values[0]
             except Exception:
                 pass  # не распарсилось — используем как обычный текст ниже
 
@@ -228,7 +238,7 @@ class SelfDebugger:
                                     [{"role": "user", "content": doc_prompt}],
                                     agent="executive"
                                 ).strip()
-                                doc_text = self._extract_docstring_text(raw_doc)
+                                doc_text = self._extract_docstring_text(raw_doc, func_name=func_name)
                                 if doc_text and editor.set_docstring(func_name, doc_text):
                                     new_content = ast.unparse(editor.tree)
                                     if editor.save():
