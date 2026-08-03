@@ -186,7 +186,7 @@ def tool_backup_file(args: dict[str, Any]) -> str:
     return f"💾 Backup: {backup_path}"
 
 
-def tool_rollback(args: Dict[str, Any]) -> str:
+def tool_rollback(args: dict[str, Any]) -> str:
     """Откат к последнему бэкапу (исключая .git)."""
     backup_dir = PROJECT_ROOT / "Storage" / "backups"
     if not backup_dir.exists():

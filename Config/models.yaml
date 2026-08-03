@@ -1,10 +1,10 @@
 ﻿agents:
-  executive: [groq, gemini, ollama]
-  brief: [groq, gemini, ollama]
-  developer: [groq, cloudflare, openrouter, ollama]
-  self_upgrade: [groq, gemini, ollama]
-  branding: [groq, gemini, ollama]
-  media: [groq, cloudflare, openrouter, ollama]
+  executive: [aitunnel, groq, gemini, ollama]
+  brief: [aitunnel, groq, gemini, ollama]
+  developer: [aitunnel, groq, cloudflare, openrouter, ollama]
+  self_upgrade: [aitunnel, groq, gemini, ollama]
+  branding: [aitunnel, groq, gemini, ollama]
+  media: [aitunnel, groq, cloudflare, openrouter, ollama]
 
 ollama_models:
   executive: qwen2.5-coder:3b
@@ -15,6 +15,11 @@ ollama_models:
   media: qwen2.5-coder:3b
 
 providers:
+  aitunnel:
+    model: deepseek-v4-flash-0731
+    base_url: https://api.aitunnel.ru/v1/
+    api_key_env: AITUNNEL_API_KEY
+    timeout: 30
   groq:
     model: llama-3.3-70b-versatile
     timeout: 15

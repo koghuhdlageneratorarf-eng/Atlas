@@ -136,6 +136,18 @@ def _parse_tool_response(content) -> dict:
             pass
     return {'thought': thought, 'tools': tools, 'response': response}
 
+def _is_casual_message(text: str) -> bool:
+    """Отличает обычное сообщение (чат) от задачи, требующей контекста проекта."""
+    text = text.strip().lower()
+    if len(text) < 15:
+        return True
+    task_markers = [
+        'файл', 'папка', 'код', 'проект','сделай','функци', 'класс', 'баг', 'ошибк',
+        'исправ', 'напиши', 'создай', 'измени', 'удали', 'рефактор',
+        'аудит', 'структур', 'архитектур', 'git', 'коммит', 'тест'
+    ]
+    return not any(marker in text for marker in task_markers)
+
 class AtlasCodeAgent:
 
     def __init__(self, session_name: str='default', agent_type: str='executive'):
@@ -176,14 +188,16 @@ class AtlasCodeAgent:
     def process(self, user_input: str) -> str:
         """Обработать запрос пользователя с циклом Tool Use."""
         self.session.add_message('user', user_input)
+        casual = _is_casual_message(user_input)
         messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
-        try:
-            import yaml
-            ceo_config = yaml.safe_load(open('agents/ceo/agent.yaml', encoding='utf-8'))
-            ceo_prompt = ceo_config.get('prompt', '')
-            messages[0]['content'] = ceo_prompt
-        except Exception as e:
-            print(f'[WARN] Не удалось загрузить CEO промпт: {e}')
+        if not casual:
+            try:
+                import yaml
+                ceo_config = yaml.safe_load(open('agents/ceo/agent.yaml', encoding='utf-8'))
+                ceo_prompt = ceo_config.get('prompt', '')
+                messages[0]['content'] = ceo_prompt
+            except Exception as e:
+                print(f'[WARN] Не удалось загрузить CEO промпт: {e}')
         history = self.session.get_history(limit=20)
         for msg in history:
             if msg['role'] == 'system':
@@ -192,9 +206,12 @@ class AtlasCodeAgent:
                 messages.append({'role': 'user', 'content': f"[РЕЗУЛЬТАТ] {msg['content'][:4000]}"})
             else:
                 messages.append({'role': msg['role'], 'content': msg['content'][:4000]})
-        project_ctx = self.context.get_context(max_tokens=2000)
-        full_input = f'=== КОНТЕКСТ ПРОЕКТА ===\n{project_ctx[:3000]}\n=== КОНЕЦ КОНТЕКСТА ===\n\nЗАДАЧА: {user_input}'
-        messages.append({'role': 'user', 'content': full_input})
+        if casual:
+            messages.append({'role': 'user', 'content': user_input})
+        else:
+            project_ctx = self.context.get_context(max_tokens=2000)
+            full_input = f'=== КОНТЕКСТ ПРОЕКТА ===\n{project_ctx[:3000]}\n=== КОНЕЦ КОНТЕКСТА ===\n\nЗАДАЧА: {user_input}'
+            messages.append({'role': 'user', 'content': full_input})
         iteration = 0
         seen_tools = set()
         while iteration < self.max_tool_iterations:

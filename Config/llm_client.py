@@ -1,4 +1,4 @@
-﻿"""Atlas Brain Router — LLM client with Graphify context + multi-provider fallback."""
+﻿"""Atlas Brain Router — LLM client with Graphify context + OmniRoute (primary) + multi-provider fallback."""
 
 import os
 import sys
@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).parent.parent / "Brain"))
 try:
     from graphify_bridge import get_context as graphify_context
-
     GRAPHIFY_AVAILABLE = True
 except ImportError:
     GRAPHIFY_AVAILABLE = False
@@ -27,12 +26,10 @@ print(f"[DEBUG] Looking for .env at: {env_path}")
 print(f"[DEBUG] .env exists: {env_path.exists()}")
 if env_path.exists():
     load_dotenv(env_path, override=True)
-    print(
-        f"[DEBUG] OPENROUTER_KEY loaded: {'yes' if os.getenv('OPENROUTER_API_KEY') else 'no'}"
-    )
+    print(f"[DEBUG] OPENROUTER_KEY loaded: {'yes' if os.getenv('OPENROUTER_API_KEY') else 'no'}")
     print(f"[DEBUG] GROQ_KEY loaded: {'yes' if os.getenv('GROQ_API_KEY') else 'no'}")
 
-# Config
+# Config (for fallback providers)
 CONFIG_PATH = Path(__file__).parent / "models.yaml"
 if CONFIG_PATH.exists():
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -40,10 +37,23 @@ if CONFIG_PATH.exists():
 else:
     MODELS_CONFIG = {}
 
+# ===== OmniRoute (primary gateway) client =====
+from openai import OpenAI
+
+LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL", "http://localhost:20128/v1")
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "dummy")  # OmniRoute doesn't enforce key by default
+
+lite_llm_client = OpenAI(
+    base_url=LITELLM_BASE_URL,
+    api_key=LITELLM_API_KEY,
+    timeout=30.0,       # было 120.0 — слишком долго ждём перед фолбэком
+    max_retries=0,      # отключаем встроенные ретраи SDK, у нас свой фолбэк-механизм
+)
+
+# ===== Fallback providers (unchanged) =====
 OLLAMA_URL = "http://localhost:11434/api/chat"
 DEFAULT_MODEL = "qwen2.5-coder:3b"
 
-# API keys
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 CEREBRAS_KEY = os.getenv("CEREBRAS_API_KEY", "")
 GROQ_KEY = os.getenv("GROQ_API_KEY", "")
@@ -51,16 +61,20 @@ OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY", "")
 CLOUDFLARE_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "")
 HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "")
 
-# Provider endpoints
 PROVIDERS = {
+    "aitunnel": {
+        "url": "https://api.aitunnel.ru/v1/chat/completions",
+        "key": os.getenv("AITUNNEL_API_KEY", ""),
+        "header": lambda k: {"Authorization": f"Bearer {k}"},
+        "payload": lambda msg: {"model": "deepseek-v4-flash-0731", "messages": msg, "temperature": 0.3, "max_tokens": 8192},
+        "extract": lambda r: r["choices"][0]["message"]["content"],
+    },
     "gemini": {
         "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
         "key": GEMINI_KEY,
         "header": lambda k: {"x-goog-api-key": k},
         "payload": lambda msg: {
-            "contents": [
-                {"role": m["role"], "parts": [{"text": m["content"]}]} for m in msg
-            ],
+            "contents": [{"role": m["role"], "parts": [{"text": m["content"]}]} for m in msg],
             "generationConfig": {"temperature": 0.3},
         },
         "extract": lambda r: r["candidates"][0]["content"]["parts"][0]["text"],
@@ -69,37 +83,21 @@ PROVIDERS = {
         "url": "https://api.cerebras.ai/v1/chat/completions",
         "key": CEREBRAS_KEY,
         "header": lambda k: {"Authorization": f"Bearer {k}"},
-        "payload": lambda msg: {
-            "model": "llama-3.1-8b",
-            "messages": msg,
-            "temperature": 0.3,
-        },
+        "payload": lambda msg: {"model": "llama-3.1-8b", "messages": msg, "temperature": 0.3, "max_tokens": 8192},
         "extract": lambda r: r["choices"][0]["message"]["content"],
     },
     "groq": {
         "url": "https://api.groq.com/openai/v1/chat/completions",
         "key": GROQ_KEY,
         "header": lambda k: {"Authorization": f"Bearer {k}"},
-        "payload": lambda msg: {
-            "model": "llama-3.3-70b-versatile",
-            "messages": msg,
-            "temperature": 0.3,
-        },
+        "payload": lambda msg: {"model": "llama-3.3-70b-versatile", "messages": msg, "temperature": 0.3, "max_tokens": 8192},
         "extract": lambda r: r["choices"][0]["message"]["content"],
     },
     "openrouter": {
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "key": OPENROUTER_KEY,
-        "header": lambda k: {
-            "Authorization": f"Bearer {k}",
-            "HTTP-Referer": "https://atlas.local",
-            "X-Title": "Atlas",
-        },
-        "payload": lambda msg: {
-            "model": "openrouter/auto",
-            "messages": msg,
-            "temperature": 0.3,
-        },
+        "header": lambda k: {"Authorization": f"Bearer {k}", "HTTP-Referer": "https://atlas.local", "X-Title": "Atlas"},
+        "payload": lambda msg: {"model": "openrouter/auto", "messages": msg, "temperature": 0.3, "max_tokens": 8192},
         "extract": lambda r: r["choices"][0]["message"]["content"],
     },
     "cloudflare": {
@@ -113,21 +111,13 @@ PROVIDERS = {
         "url": "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct",
         "key": HF_TOKEN,
         "header": lambda k: {"Authorization": f"Bearer {k}"},
-        "payload": lambda msg: {
-            "inputs": msg[-1]["content"],
-            "parameters": {"max_new_tokens": 1024},
-        },
-        "extract": lambda r: (
-            r[0]["generated_text"]
-            if isinstance(r, list)
-            else r.get("generated_text", "")
-        ),
+        "payload": lambda msg: {"inputs": msg[-1]["content"], "parameters": {"max_new_tokens": 1024}},
+        "extract": lambda r: r[0]["generated_text"] if isinstance(r, list) else r.get("generated_text", ""),
     },
 }
 
-
 def _call_provider(name: str, messages: list, timeout: int = 60) -> str:
-    """Call a specific provider."""
+    """Call a specific fallback provider."""
     cfg = PROVIDERS[name]
     if not cfg["key"]:
         raise ValueError(f"No API key for {name}")
@@ -149,7 +139,6 @@ def _call_provider(name: str, messages: list, timeout: int = 60) -> str:
         result = json.dumps(result, ensure_ascii=False)
     return result
 
-
 def _compress_messages(messages: list, max_chars: int = 6000) -> list:
     """Compress context for 3b models."""
     total = sum(len(m.get("content", "")) for m in messages)
@@ -158,7 +147,6 @@ def _compress_messages(messages: list, max_chars: int = 6000) -> list:
     system_msgs = [m for m in messages if m.get("role") == "system"]
     other_msgs = [m for m in messages if m.get("role") != "system"]
     return system_msgs + other_msgs[-3:]
-
 
 def _call_ollama(messages: list, model: str = DEFAULT_MODEL, timeout: int = 120) -> str:
     """Ollama with JSON format guarantee."""
@@ -170,13 +158,12 @@ def _call_ollama(messages: list, model: str = DEFAULT_MODEL, timeout: int = 120)
             "messages": compressed,
             "stream": False,
             "format": "json",
-            "options": {"temperature": 0.1, "num_predict": 2048},
+            "options": {"temperature": 0.1, "num_predict": 8192},
         },
         timeout=timeout,
     )
     response.raise_for_status()
     return response.json()["message"]["content"]
-
 
 def _inject_graphify_context(messages: list, task: str = "") -> list:
     """
@@ -192,7 +179,6 @@ def _inject_graphify_context(messages: list, task: str = "") -> list:
 
     context_block = f"\n=== PROJECT CONTEXT ===\n{context}\n=== END CONTEXT ===\nUse this info. Don't create files/folders that already exist."
 
-    # Find last user message and append context
     new_messages = []
     last_user_idx = -1
     for i, m in enumerate(messages):
@@ -209,24 +195,53 @@ def _inject_graphify_context(messages: list, task: str = "") -> list:
 
     return new_messages
 
-
 def ask_llm(
-    messages: list, agent: str = "developer", use_graph: bool = True, timeout: int = 120
+    messages: list,
+    agent: str = "developer",
+    use_graph: bool = True,
+    timeout: int = 120,
+    temperature: float = 0.3,
 ) -> str:
     """
-    Smart router with Graphify context injected into user message (not system).
+    Smart router: primary = OmniRoute gateway, fallback = legacy providers.
 
     Args:
         messages: list of messages
         agent: "executive", "brief", "developer", "self_upgrade"
         use_graph: whether to load Graphify context
+        timeout: request timeout
+        temperature: sampling temperature
     """
-    # 1. Inject Graphify context into last user message (NOT as system message)
+    # 1. Inject Graphify context into last user message
     if use_graph and GRAPHIFY_AVAILABLE:
         task = messages[-1].get("content", "") if messages else ""
         messages = _inject_graphify_context(messages, task)
 
-    # 2. Provider priorities for agent
+    # 2. Map agent to OmniRoute combo-route model name
+    model_map = {
+        "executive": "auto/best-reasoning",
+        "developer": "auto/best-coding",
+        "brief": "auto/best-fast",
+        "self_upgrade": "auto/best-coding",  # fallback
+    }
+    model = model_map.get(agent, "auto/best-coding")
+
+    # 3. Try OmniRoute first
+    try:
+        print(f"[Brain] {agent} -> OmniRoute (model: {model})")
+        response = lite_llm_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            timeout=timeout,
+            max_tokens=8192,
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"[!] OmniRoute failed: {e}. Falling back to legacy router.")
+
+    # 4. Fallback to legacy providers
+    # Use existing priorities from config
     priorities = MODELS_CONFIG.get("agents", {}).get(agent, ["ollama"])
     ollama_models = MODELS_CONFIG.get("ollama_models", {})
 
@@ -251,11 +266,12 @@ def ask_llm(
                 print(f"[!] {provider} failed: {e}")
                 continue
 
-    raise RuntimeError(f"All providers failed. Last error: {last_error}")
+    raise RuntimeError(f"All providers (including fallback) failed. Last error: {last_error}")
 
+# Остальные функции (diagnose, main) оставляем без изменений, т.к. они используются для отладки и тестов.
 
 def diagnose():
-    """Check all providers."""
+    """Check all providers, including OmniRoute."""
     print("=" * 50)
     print("ATLAS BRAIN DIAGNOSTIC")
     print("=" * 50)
@@ -263,10 +279,24 @@ def diagnose():
     print(f"\n[Graphify] Available: {GRAPHIFY_AVAILABLE}")
     if GRAPHIFY_AVAILABLE:
         from graphify_bridge import build_graph
-
         build_graph()
         ctx = graphify_context("skills web", max_nodes=5)
         print(f"Context sample:\n{ctx[:500]}...")
+
+    print("\n[OmniRoute]")
+    try:
+        # Simple test request
+        test_msg = [{"role": "user", "content": "Say 'OK'"}]
+        response = lite_llm_client.chat.completions.create(
+            model="auto/best-fast",
+            messages=test_msg,
+            max_tokens=5,
+            temperature=0.0,
+            timeout=10,
+        )
+        print(f"  OK: {response.choices[0].message.content}")
+    except Exception as e:
+        print(f"  ERROR: {e}")
 
     print("\n[PROVIDERS]")
     for name, cfg in PROVIDERS.items():
@@ -304,13 +334,12 @@ def diagnose():
             except Exception as e:
                 print(f"  FAIL {name.upper()}: {e}")
 
-
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--diagnose", action="store_true")
-    parser.add_argument("--test", choices=list(PROVIDERS.keys()) + ["ollama"])
+    parser.add_argument("--test", choices=list(PROVIDERS.keys()) + ["ollama", "litellm"])
     args = parser.parse_args()
 
     if args.diagnose:
@@ -322,6 +351,17 @@ if __name__ == "__main__":
         ]
         if args.test == "ollama":
             print(_call_ollama(msg))
+        elif args.test == "litellm":
+            try:
+                response = lite_llm_client.chat.completions.create(
+                    model="auto/best-fast",
+                    messages=msg,
+                    max_tokens=5,
+                    temperature=0.0,
+                )
+                print(response.choices[0].message.content)
+            except Exception as e:
+                print(f"OmniRoute error: {e}")
         else:
             print(_call_provider(args.test, msg))
     else:
