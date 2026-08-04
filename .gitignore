@@ -39,3 +39,10 @@ Storage/logs/
 Storage/backups/
 Storage/chroma_semantic/
 *.bak
+
+graphify-out/
+objects.txt
+deepseek_test.py
+hh_job_collector.py
+test.txt
+test_aitunnel.py
