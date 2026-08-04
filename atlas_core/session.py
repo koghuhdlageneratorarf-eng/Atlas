@@ -96,7 +96,7 @@ class SessionManager:
             """SELECT role, content, tool_calls, tool_call_id
                FROM messages
                WHERE session_id = ?
-               ORDER BY timestamp ASC
+               ORDER BY timestamp DESC
                LIMIT ?""",
             (self.session_id, limit),
         )
@@ -111,6 +111,7 @@ class SessionManager:
             if tool_call_id:
                 msg["tool_call_id"] = tool_call_id
             history.append(msg)
+        history.reverse()
         return history
 
     def clear_history(self):

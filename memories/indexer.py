@@ -12,6 +12,14 @@ from chromadb.utils import embedding_functions
 
 PROJECT_ROOT = Path(__file__).parent.parent
 CHROMA_PATH = PROJECT_ROOT / "Storage" / "chroma"
+_instance = None
+
+
+def get_memory_indexer():
+    global _instance
+    if _instance is None:
+        _instance = MemoryIndexer()
+    return _instance
 
 
 class MemoryIndexer:

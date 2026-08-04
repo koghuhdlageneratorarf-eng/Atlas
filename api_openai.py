@@ -37,6 +37,7 @@ from atlas_core.agent import AtlasCodeAgent
 from atlas_core.session import SessionManager
 from atlas_core.context import ProjectContext
 from atlas_core.tools import create_backup, run_command
+from Config.llm_client import ask_llm
 
 app = FastAPI(title="Atlas AI OS API", version="11.2")
 
@@ -55,6 +56,13 @@ ATLAS_MODELS = [
     {"id": "atlas-developer", "object": "model", "owned_by": "atlas"},
     {"id": "atlas-brief", "object": "model", "owned_by": "atlas"},
 ]
+
+def _is_webui_utility_task(req: "ChatRequest") -> bool:
+    """Детектирует служебные запросы Open WebUI (генерация заголовка, тегов и т.п.),
+    которые не должны попадать в сессию агента."""
+    markers = ["### Task:", "generate a concise", "JSON format:", "summariz"]
+    all_text = " ".join(m.content for m in req.messages).lower()
+    return any(marker.lower() in all_text for marker in markers)
 
 class ChatMessage(BaseModel):
     role: str
@@ -88,6 +96,26 @@ async def chat_completion(req: ChatRequest):
     user_input = user_messages[-1].content
     if user_input.startswith("/"):
         return _handle_slash_command(user_input)
+    if _is_webui_utility_task(req):
+        logger.info("Служебный запрос Open WebUI (заголовок/теги), в обход сессии агента")
+        raw_messages = [{"role": m.role, "content": m.content} for m in req.messages]
+        try:
+            result = ask_llm(raw_messages, agent="brief", use_graph=False)
+        except Exception as e:
+            logger.error(f"Ошибка служебного запроса: {e}")
+            result = ""
+        return {
+            "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": req.model,
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": result},
+                "finish_reason": "stop"
+            }],
+            "usage": {"total_tokens": len(result)}
+        }
 
     session_id = "webui_default"
     if session_id not in agents:

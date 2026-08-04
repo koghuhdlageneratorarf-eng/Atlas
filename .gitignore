@@ -33,3 +33,9 @@ Skills/agency/
 memories/Screens/
 Storage/chroma/
 Memory/*.db
+
+# Runtime data
+Storage/logs/
+Storage/backups/
+Storage/chroma_semantic/
+*.bak

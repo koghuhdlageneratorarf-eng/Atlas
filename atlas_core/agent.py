@@ -3,14 +3,18 @@ Atlas_Core/agent.py — Atlas Code Agent v1.3
 REPL + цикл Tool Use. Фиксы: dict-guard, JSON format, dedup tools.
 """
 import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 import json
 import os
 import re
-import sys
 import textwrap
 from pathlib import Path
+
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 from atlas_core.tools import TOOL_REGISTRY
 from core.runtime.engine import get_runtime
 _runtime = None
@@ -401,19 +405,18 @@ def handle_command(cmd: str, agent: AtlasCodeAgent) -> str | None:
         except Exception as e:
             print(f'❌ Ошибка: {e}')
     elif command == '/core':
-        from core.runtime.engine import RuntimeEngine
-        engine = RuntimeEngine()
+        engine = get_atlas_runtime()
         print(engine.status())
         print('Агенты:', engine.list_agents())
     elif command == '/add_task':
         from core.runtime.engine import RuntimeEngine
-        engine = RuntimeEngine()
+        engine = get_runtime()
         task = {'name': arg or 'Новая задача', 'priority': 'medium'}
         engine.add_task(task)
         print(f"✅ Задача добавлена: {task['name']} (ID: {task['id']})")
     elif command == '/agents':
         from core.runtime.engine import RuntimeEngine
-        engine = RuntimeEngine()
+        engine = get_runtime()
         print('Агенты:')
         for name in engine.list_agents():
             agent = engine.get_agent(name)
@@ -425,7 +428,7 @@ def handle_command(cmd: str, agent: AtlasCodeAgent) -> str | None:
         import yaml
         from Config.llm_client import ask_llm
         from core.runtime.engine import RuntimeEngine
-        engine = RuntimeEngine()
+        engine = get_runtime()
         agent_config = engine.get_agent('architect')
         if not agent_config:
             print('❌ Агент Architect не найден')
@@ -440,7 +443,7 @@ def handle_command(cmd: str, agent: AtlasCodeAgent) -> str | None:
         import yaml
         from Config.llm_client import ask_llm
         from core.runtime.engine import RuntimeEngine
-        engine = RuntimeEngine()
+        engine = get_runtime()
         agent_config = engine.get_agent('reviewer')
         if not agent_config:
             print('❌ Агент Reviewer не найден')

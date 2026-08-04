@@ -9,6 +9,7 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Any
+from Config.debug import debug
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
@@ -71,7 +72,7 @@ def tool_list_directory(args: dict[str, Any]) -> str:
 
 def tool_read_file(args: dict[str, Any]) -> str:
     path = _safe_path(_get_path_arg(args))
-    print(f"[WRITE DEBUG] path={path}")
+    debug(f"[WRITE DEBUG] path={path}")
     if not path.exists():
         return f"❌ File not found: {path}"
     try:
@@ -124,7 +125,13 @@ def tool_run_command(args: dict[str, Any]) -> str:
     timeout = args.get("timeout", 30)
     try:
         result = subprocess.run(
-            cmd, shell=True, cwd=cwd, capture_output=True, text=True, timeout=timeout
+            ["powershell", "-Command", cmd],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout
         )
         out = result.stdout or ""
         err = result.stderr or ""

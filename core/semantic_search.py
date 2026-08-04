@@ -37,7 +37,7 @@ class SemanticSearch:
         self.collection = self.client.get_or_create_collection(
             name=collection_name, embedding_function=self.embedding_fn
         )
-        self._indexed = False
+        self._indexed = self.collection.count() > 0
 
     def index_file(self, filepath: Path) -> bool:
         if not filepath.exists():

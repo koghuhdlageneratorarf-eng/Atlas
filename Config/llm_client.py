@@ -11,6 +11,7 @@ from pathlib import Path
 import requests
 import yaml
 from dotenv import load_dotenv
+from Config.debug import debug
 
 # Graphify bridge
 sys.path.insert(0, str(Path(__file__).parent.parent / "Brain"))
@@ -22,12 +23,12 @@ except ImportError:
 
 # Load env
 env_path = Path(__file__).parent / ".env"
-print(f"[DEBUG] Looking for .env at: {env_path}")
-print(f"[DEBUG] .env exists: {env_path.exists()}")
+debug(f"[DEBUG] Looking for .env at: {env_path}")
+debug(f"[DEBUG] .env exists: {env_path.exists()}")
 if env_path.exists():
     load_dotenv(env_path, override=True)
-    print(f"[DEBUG] OPENROUTER_KEY loaded: {'yes' if os.getenv('OPENROUTER_API_KEY') else 'no'}")
-    print(f"[DEBUG] GROQ_KEY loaded: {'yes' if os.getenv('GROQ_API_KEY') else 'no'}")
+    debug(f"[DEBUG] OPENROUTER_KEY loaded: {'yes' if os.getenv('OPENROUTER_API_KEY') else 'no'}")
+    debug(f"[DEBUG] GROQ_KEY loaded: {'yes' if os.getenv('GROQ_API_KEY') else 'no'}")
 
 # Config (for fallback providers)
 CONFIG_PATH = Path(__file__).parent / "models.yaml"
@@ -40,8 +41,9 @@ else:
 # ===== OmniRoute (primary gateway) client =====
 from openai import OpenAI
 
-LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL", "http://localhost:20128/v1")
-LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "dummy")  # OmniRoute doesn't enforce key by default
+LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL", "https://api.aitunnel.ru/v1/")
+USE_OMNIROUTE = True
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", os.getenv("AITUNNEL_API_KEY", ""))  # OmniRoute doesn't enforce key by default
 
 lite_llm_client = OpenAI(
     base_url=LITELLM_BASE_URL,
@@ -119,6 +121,7 @@ PROVIDERS = {
 def _call_provider(name: str, messages: list, timeout: int = 60) -> str:
     """Call a specific fallback provider."""
     cfg = PROVIDERS[name]
+    debug("[DEBUG MESSAGES]", messages[-2:])
     if not cfg["key"]:
         raise ValueError(f"No API key for {name}")
 
@@ -199,7 +202,7 @@ def ask_llm(
     messages: list,
     agent: str = "developer",
     use_graph: bool = True,
-    timeout: int = 120,
+    timeout: int = 60,
     temperature: float = 0.3,
 ) -> str:
     """
@@ -220,25 +223,39 @@ def ask_llm(
     # 2. Map agent to OmniRoute combo-route model name
     model_map = {
         "executive": "auto/best-reasoning",
-        "developer": "auto/best-coding",
+        "developer": "deepseek-v4-flash-0731",
         "brief": "auto/best-fast",
-        "self_upgrade": "auto/best-coding",  # fallback
+        "self_upgrade": "deepseek-v4-flash-0731",
     }
-    model = model_map.get(agent, "auto/best-coding")
+    model = model_map.get(agent, "auto/best-reasoning")
 
     # 3. Try OmniRoute first
-    try:
-        print(f"[Brain] {agent} -> OmniRoute (model: {model})")
-        response = lite_llm_client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            timeout=timeout,
-            max_tokens=8192,
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"[!] OmniRoute failed: {e}. Falling back to legacy router.")
+    if USE_OMNIROUTE:
+        try:
+            response = lite_llm_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                timeout=timeout,
+                max_tokens=8192,
+                stream=False,
+            )
+
+            msg = response.choices[0].message
+
+            content = msg.content
+
+            # DeepSeek иногда возвращает JSON в reasoning
+            if not content:
+                content = getattr(msg, "reasoning", "")
+
+            # Если и там пусто — вернуть весь объект для диагностики
+            if not content:
+                return ""
+
+            return content
+        except Exception as e:
+            print(f"[!] OmniRoute failed: {e}. Falling back to legacy router.")
 
     # 4. Fallback to legacy providers
     # Use existing priorities from config

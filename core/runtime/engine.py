@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any
+from pathlib import Path
+import yaml
 
 # ============================================================
 # STATE
@@ -188,6 +190,23 @@ class RuntimeEngine:
         self.tools: dict[str, Callable] = {}
         self._state_listeners: list[Callable] = []
         self.event_bus = EventBus()
+        self._load_agents()
+
+    def _load_agents(self):
+        agents_dir = Path("agents")
+        if not agents_dir.exists():
+            return
+
+        for yaml_file in agents_dir.rglob("agent.yaml"):
+            try:
+                with open(yaml_file, encoding="utf-8") as f:
+                    config = yaml.safe_load(f)
+
+                name = config.get("name") or yaml_file.parent.name
+                self.register_agent(name, config)
+
+            except Exception as e:
+                print(f"[Runtime] Agent load error {yaml_file}: {e}")
 
     # ============================================================
     # TASK MANAGEMENT

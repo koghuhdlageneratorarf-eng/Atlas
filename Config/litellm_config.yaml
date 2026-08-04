@@ -1,0 +1,22 @@
+model_list:
+  - model_name: atlas-brief
+    litellm_params:
+      model: openai/deepseek-v4-flash-0731
+      api_base: https://api.aitunnel.ru/v1
+      api_key: os.environ/AITUNNEL_API_KEY
+
+  - model_name: atlas-executive
+    litellm_params:
+      model: openai/deepseek-v4-flash-0731
+      api_base: https://api.aitunnel.ru/v1
+      api_key: os.environ/AITUNNEL_API_KEY
+
+  - model_name: atlas-developer
+    litellm_params:
+      model: openai/deepseek-v4-flash-0731
+      api_base: https://api.aitunnel.ru/v1
+      api_key: os.environ/AITUNNEL_API_KEY
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
