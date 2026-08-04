@@ -19,6 +19,7 @@ from enum import Enum
 from typing import Any
 from pathlib import Path
 import yaml
+from core.permissions.engine import get_permission_engine
 
 # ============================================================
 # STATE
@@ -448,6 +449,10 @@ class RuntimeEngine:
 
     def execute_tool(self, name: str, args: dict) -> dict:
         """Выполнить инструмент через Runtime."""
+        pe = get_permission_engine()
+        allowed, reason = pe.can_execute(name)
+        if not allowed:
+            return {"error": pe.require_confirmation(name)}
         tool = self.tools.get(name)
         if not tool:
             return {"error": f"Tool {name} not found"}

@@ -69,7 +69,7 @@ class PermissionEngine:
         if risk == RiskLevel.SAFE:
             return True, "safe"
         if risk == RiskLevel.MEDIUM:
-            return True, "needs_confirmation"
+            return False, "needs_confirmation"
         if risk == RiskLevel.HIGH:
             return action in self.approved, f"needs_approval ({action})"
         if risk == RiskLevel.CRITICAL:

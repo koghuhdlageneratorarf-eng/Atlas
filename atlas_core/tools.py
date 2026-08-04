@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 from Config.debug import debug
+from core.permissions.engine import get_permission_engine
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
@@ -227,6 +228,10 @@ TOOL_REGISTRY = {
 
 
 def execute_tool(name: str, args: dict[str, Any]) -> str:
+    pe = get_permission_engine()
+    allowed, reason = pe.can_execute(name)
+    if not allowed:
+        return pe.require_confirmation(name)
     if name not in TOOL_REGISTRY:
         return f"❌ Unknown tool: {name}. Available: {list(TOOL_REGISTRY.keys())}"
     try:
